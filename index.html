@@ -35,7 +35,6 @@
       border-radius: 50%; 
       margin: 20px auto; 
       box-shadow: 0 0 45px currentColor; 
-      transition: all 0.4s;
     }
     .green { background: #22ff44; }
     .red { background: #ff2222; }
@@ -50,6 +49,7 @@
       margin: 15px;
     }
     .status { font-size: 1.6em; font-weight: bold; margin: 10px 0; }
+    .error { color: #ff6666; }
   </style>
 </head>
 <body>
@@ -60,15 +60,36 @@
   <script>
     const ICS_URL = "https://outlook.office365.com/owa/calendar/97967830e98945e38f6aaefb6042710b@mbu.edu/0521f667626a42ee90cfb1ff0222d6338862321817573157099/calendar.ics";
 
+    const proxies = [
+      "https://api.allorigins.win/raw?url=",
+      "https://corsproxy.io/?",
+      "https://proxy.cors.sh/",
+      "https://api.codetabs.com/v1/proxy?quest="
+    ];
+
+    async function tryFetchICS() {
+      for (let proxy of proxies) {
+        try {
+          const url = proxy + encodeURIComponent(ICS_URL);
+          const response = await fetch(url);
+          if (response.ok) {
+            const text = await response.text();
+            if (text.includes("BEGIN:VCALENDAR")) {
+              return text;
+            }
+          }
+        } catch (e) {}
+      }
+      throw new Error("All proxies failed");
+    }
+
     async function loadDashboard() {
       const dashboard = document.getElementById("dashboard");
-      dashboard.innerHTML = "<p style='color:#ff0;'>Loading live data...</p>";
+      dashboard.innerHTML = "<p style='color:#ff0;'>Loading live calendar data...</p>";
 
       try {
-        const response = await fetch(ICS_URL);
-        if (!response.ok) throw new Error("Failed to load");
-
-        const icsText = await response.text();
+        const icsText = await tryFetchICS();
+        
         const jcalData = ICAL.parse(icsText);
         const comp = new ICAL.Component(jcalData);
         const events = comp.getAllSubcomponents("vevent");
@@ -109,14 +130,14 @@
 
       } catch (err) {
         console.error(err);
-        dashboard.innerHTML = `<p style="color:red; padding:20px;">
-          Could not load calendar data.<br>
-          This usually works better when hosted on GitHub Pages.
+        dashboard.innerHTML = `<p class="error">
+          Still having trouble loading the calendar.<br><br>
+          Try clicking "Refresh Now" a couple of times.<br>
+          Or let me know and I'll give you another option.
         </p>`;
       }
     }
 
-    // Auto refresh every 2 minutes
     setInterval(loadDashboard, 120000);
     window.onload = loadDashboard;
   </script>
