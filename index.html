@@ -22,7 +22,7 @@
       overflow-x: hidden;
     }
 
-    /* Watermarked Logo Background */
+    /* Watermarked SaberCats Logo */
     body::before {
       content: "";
       position: fixed;
@@ -32,7 +32,7 @@
       width: 380px;
       height: 380px;
       background: url('https://raw.githubusercontent.com/bones3i/facilities-dashboard/main/saber-m-w-gold.png') center/contain no-repeat;
-      opacity: 0.06;
+      opacity: 0.07;
       z-index: 0;
       pointer-events: none;
     }
@@ -67,21 +67,42 @@
       z-index: 1;
     }
 
-    .location { font-size: 1.2em; font-weight: bold; }
-    .center { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-    .light { width: 48px; height: 48px; border-radius: 50%; box-shadow: 0 0 16px currentColor; }
+    .location { 
+      font-size: 1.2em; 
+      font-weight: bold; 
+    }
+    .center { 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      gap: 4px; 
+    }
+    .light { 
+      width: 48px; 
+      height: 48px; 
+      border-radius: 50%; 
+      box-shadow: 0 0 16px currentColor; 
+    }
     .green { background: #22ff44; }
     .red   { background: #ff2222; }
     .gray  { background: #888888; }
-    .status { font-size: 1.25em; font-weight: bold; }
-    .info { font-size: 0.95em; opacity: 0.9; text-align: right; line-height: 1.3; }
+    .status { 
+      font-size: 1.25em; 
+      font-weight: bold; 
+    }
+    .info { 
+      font-size: 0.95em; 
+      opacity: 0.9; 
+      text-align: right; 
+      line-height: 1.3; 
+    }
 
     button {
       background: var(--gold);
       color: var(--navy);
       border: none;
       padding: 14px 20px;
-      font-size: 1.1em;
+      font-size: 1.15em;
       font-weight: bold;
       border-radius: 8px;
       cursor: pointer;
@@ -90,7 +111,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: 12px;
       position: relative;
       z-index: 1;
     }
@@ -106,7 +127,7 @@
   </style>
 </head>
 <body>
-  <h1>🏟️ MBU Gym Facilities Live</h1>
+  <h1>🏟️ MBU Facilities Live</h1>
   <button onclick="loadDashboard()">
     🔄 <span>Refresh Now</span>
   </button>
@@ -114,15 +135,139 @@
   <div id="lastUpdated" class="last-updated"></div>
 
   <script>
-    // ... [Keep the exact same JavaScript from the previous version] ...
     const ICS_URL = "https://outlook.office365.com/owa/calendar/97967830e98945e38f6aaefb6042710b@mbu.edu/0521f667626a42ee90cfb1ff0222d6338862321817573157099/calendar.ics";
 
-    function isFacilityOpen(now = new Date()) { /* same as before */ }
-    function getNextOpening(now = new Date()) { /* same as before */ }
+    function isFacilityOpen(now = new Date()) {
+      const day = now.getDay();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      const currentTime = hour * 60 + minute;
+
+      let openTime, closeTime;
+
+      if (day >= 1 && day <= 5) { // Monday–Friday
+        openTime = 6 * 60;
+        closeTime = 21 * 60 + 45;
+      } else if (day === 6) { // Saturday
+        openTime = 10 * 60;
+        closeTime = 21 * 60;
+      } else { // Sunday
+        openTime = 19 * 60 + 45;
+        closeTime = 21 * 60 + 45;
+      }
+      return currentTime >= openTime && currentTime <= closeTime;
+    }
+
+    function getNextOpening(now = new Date()) {
+      const day = now.getDay();
+      if (day >= 1 && day <= 5) return "tomorrow at 6:00 AM";
+      if (day === 6) return "tomorrow at 6:00 AM";
+      return "tomorrow at 10:00 AM";
+    }
 
     async function loadDashboard() {
-      // ... [Keep the full loadDashboard function from the previous version] ...
-      // (I'm not repeating the entire 80+ lines here to save space — just copy the whole script block from the last version)
+      const dashboard = document.getElementById("dashboard");
+      dashboard.innerHTML = "<p style='color:#F2C94C;text-align:center;padding:20px;'>Loading live data...</p>";
+
+      try {
+        let icsText;
+        try { 
+          const r = await fetch(ICS_URL); 
+          if (r.ok) icsText = await r.text(); 
+        } catch(e){}
+
+        if (!icsText) {
+          const proxies = [
+            "https://api.allorigins.win/raw?url=", 
+            "https://corsproxy.io/?", 
+            "https://api.codetabs.com/v1/proxy?quest="
+          ];
+          for (let p of proxies) {
+            try {
+              const r = await fetch(p + encodeURIComponent(ICS_URL));
+              if (r.ok) { 
+                icsText = await r.text(); 
+                if (icsText.includes("BEGIN:VCALENDAR")) break; 
+              }
+            } catch(e){}
+          }
+        }
+
+        const jcalData = ICAL.parse(icsText);
+        const comp = new ICAL.Component(jcalData);
+        const events = comp.getAllSubcomponents("vevent");
+
+        const now = new Date();
+        const isOpen = isFacilityOpen(now);
+        dashboard.innerHTML = "";
+
+        const locations = ["Main Gym", "FCG", "Weight Room"];
+
+        locations.forEach(loc => {
+          let isOccupied = false;
+          let currentEvent = null;
+          let nextEvent = null;
+
+          const relevant = events
+            .map(vevent => new ICAL.Event(vevent))
+            .filter(ev => (ev.location || "").toLowerCase().includes(loc.toLowerCase()))
+            .sort((a,b) => a.startDate.toJSDate() - b.startDate.toJSDate());
+
+          for (let ev of relevant) {
+            const start = ev.startDate.toJSDate();
+            const end = ev.endDate.toJSDate();
+            if (start <= now && end >= now) {
+              isOccupied = true;
+              currentEvent = ev;
+            } else if (!nextEvent && start > now) {
+              nextEvent = ev;
+              break;
+            }
+          }
+
+          let lightClass = "gray";
+          let statusText = "CLOSED";
+          let statusColor = "#aaa";
+          let infoText = `Opens ${getNextOpening(now)}`;
+
+          if (isOpen) {
+            if (isOccupied && currentEvent) {
+              lightClass = "red";
+              statusText = "OCCUPIED";
+              statusColor = "#ff4444";
+              const endStr = currentEvent.endDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'});
+              infoText = `Available at ${endStr}`;
+            } else {
+              lightClass = "green";
+              statusText = "FREE";
+              statusColor = "#22ff44";
+              const nextStr = nextEvent 
+                ? nextEvent.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'})
+                : "rest of day";
+              infoText = `Free until ${nextStr}`;
+            }
+          }
+
+          const tile = document.createElement("div");
+          tile.className = "tile";
+          tile.innerHTML = `
+            <div class="location">${loc}</div>
+            <div class="center">
+              <div class="light ${lightClass}"></div>
+              <div class="status" style="color:${statusColor}">${statusText}</div>
+            </div>
+            <div class="info">${infoText}</div>
+          `;
+          dashboard.appendChild(tile);
+        });
+
+        document.getElementById("lastUpdated").textContent = 
+          `Last updated: ${now.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'numeric', minute:'2-digit'})} Central`;
+
+      } catch (err) {
+        console.error(err);
+        dashboard.innerHTML = `<p style="color:#ff6666;text-align:center;padding:20px;">Error loading data.<br>Try Refresh Now.</p>`;
+      }
     }
 
     setInterval(loadDashboard, 90000);
