@@ -22,7 +22,6 @@
       overflow-x: hidden;
     }
 
-    /* Watermarked Logo */
     body::before {
       content: "";
       position: fixed;
@@ -41,6 +40,15 @@
       color: var(--gold);
       font-size: 1.5em;
       margin: 8px 0 12px;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .section-title {
+      color: var(--gold);
+      font-size: 1.25em;
+      margin: 20px 0 8px;
       text-align: center;
       position: relative;
       z-index: 1;
@@ -95,16 +103,22 @@
       z-index: 1;
     }
 
-    .last-updated {
+    .last-updated, .disclaimer {
       font-size: 0.85em;
-      opacity: 0.7;
+      opacity: 0.75;
       text-align: center;
       margin-top: 10px;
       position: relative;
       z-index: 1;
     }
 
-    /* Modal Styles */
+    .disclaimer {
+      font-style: italic;
+      padding: 10px 15px;
+      opacity: 0.65;
+    }
+
+    /* Modal */
     .modal {
       display: none;
       position: fixed;
@@ -124,63 +138,48 @@
       width: 90%;
       color: white;
     }
-    .modal h2 {
-      color: var(--gold);
-      margin-top: 0;
-      text-align: center;
-    }
-    .hours-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .hours-table td {
-      padding: 8px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.2);
-    }
-    .hours-table td:first-child {
-      font-weight: bold;
-      width: 45%;
-      color: var(--gold);
-    }
-    .close-btn {
-      background: #ff4444;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 6px;
-      font-size: 1.1em;
-      margin-top: 15px;
-      width: 100%;
-    }
   </style>
 </head>
 <body>
   <h1>MBU Gym Facilities Live</h1>
-  <button onclick="loadDashboard()">
-    🔄 <span>Refresh Now</span>
-  </button>
-  <div id="dashboard" class="grid"></div>
-  <div id="lastUpdated" class="last-updated"></div>
+  <button onclick="loadDashboard()">🔄 Refresh Now</button>
 
-  <!-- Hours Button -->
+  <div class="section-title">Indoor Facilities</div>
+  <div id="indoor" class="grid"></div>
+
+  <div class="section-title">Outdoor Facilities</div>
+  <div id="outdoor" class="grid"></div>
+
+  <div id="lastUpdated" class="last-updated"></div>
+  <div class="disclaimer">
+    All times and information subject to change on very short notice as needed by athletic staff.
+  </div>
+
   <button onclick="showHours()">🕒 View Full Hours</button>
 
-  <!-- Modal -->
+  <!-- Hours Modal -->
   <div id="hoursModal" class="modal">
     <div class="modal-content">
-      <h2>Facilities Hours of Operation</h2>
-      <table class="hours-table">
-        <tr><td>Monday – Friday</td><td>6:00 AM – 9:45 PM</td></tr>
-        <tr><td>Wednesday</td><td>6:00 AM – 5:00 PM<br>8:30 PM – 9:45 PM</td></tr>
-        <tr><td>Saturday</td><td>10:00 AM – 9:00 PM</td></tr>
-        <tr><td>Sunday</td><td>7:45 PM – 9:45 PM</td></tr>
+      <h2 style="color:var(--gold); text-align:center; margin-top:0;">Facilities Hours of Operation</h2>
+      <table style="width:100%; border-collapse:collapse;">
+        <tr><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">Monday – Friday</td><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">6:00 AM – 9:45 PM</td></tr>
+        <tr><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">Wednesday</td><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">6:00 AM – 5:00 PM<br>8:30 PM – 9:45 PM</td></tr>
+        <tr><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">Saturday</td><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">10:00 AM – 9:00 PM</td></tr>
+        <tr><td style="padding:8px 0;">Sunday</td><td style="padding:8px 0;">7:45 PM – 9:45 PM</td></tr>
       </table>
-      <button class="close-btn" onclick="closeModal()">Close</button>
+      <button onclick="document.getElementById('hoursModal').style.display='none'" 
+              style="background:#ff4444; color:white; border:none; padding:12px; width:100%; border-radius:8px; margin-top:15px;">
+        Close
+      </button>
     </div>
   </div>
 
   <script>
-    const ICS_URL = "https://outlook.office365.com/owa/calendar/97967830e98945e38f6aaefb6042710b@mbu.edu/0521f667626a42ee90cfb1ff0222d6338862321817573157099/calendar.ics";
+    const INDOOR_ICS = "https://outlook.office365.com/owa/calendar/133079e774204692bf5b74d2c08d47e9@mbu.edu/0f582878a530483a90f72be746e6a70315624567173939097902/calendar.ics";
+    const OUTDOOR_ICS = "https://outlook.office365.com/owa/calendar/133079e774204692bf5b74d2c08d47e9@mbu.edu/291fbbd9fb5d4065a741ac7741db578211444399539403514223/calendar.ics";
+
+    const indoorLocations = ["Main Gym", "FCG", "Weight Room"];
+    const outdoorLocations = ["ACAD Field", "Quad Division"];
 
     function isFacilityOpen(now = new Date()) {
       const day = now.getDay();
@@ -222,110 +221,107 @@
       document.getElementById("hoursModal").style.display = "flex";
     }
 
-    function closeModal() {
-      document.getElementById("hoursModal").style.display = "none";
-    }
-
-    // Rest of your loadDashboard function (unchanged)
-    async function loadDashboard() {
-      const dashboard = document.getElementById("dashboard");
-      dashboard.innerHTML = "<p style='color:#F2C94C;text-align:center;padding:20px;'>Loading live data...</p>";
-
+    async function fetchICS(url) {
       try {
-        let icsText;
+        let text;
         try {
-          const r = await fetch(ICS_URL);
-          if (r.ok) icsText = await r.text();
+          const r = await fetch(url);
+          if (r.ok) text = await r.text();
         } catch(e){}
 
-        if (!icsText) {
+        if (!text) {
           const proxies = ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?", "https://api.codetabs.com/v1/proxy?quest="];
           for (let p of proxies) {
             try {
-              const r = await fetch(p + encodeURIComponent(ICS_URL));
+              const r = await fetch(p + encodeURIComponent(url));
               if (r.ok) {
-                icsText = await r.text();
-                if (icsText.includes("BEGIN:VCALENDAR")) break;
+                text = await r.text();
+                if (text.includes("BEGIN:VCALENDAR")) break;
               }
             } catch(e){}
           }
         }
-
-        const jcalData = ICAL.parse(icsText);
-        const comp = new ICAL.Component(jcalData);
-        const events = comp.getAllSubcomponents("vevent");
-
-        const now = new Date();
-        const isOpen = isFacilityOpen(now);
-        dashboard.innerHTML = "";
-
-        const locations = ["Main Gym", "FCG", "Weight Room"];
-
-        locations.forEach(loc => {
-          let isOccupied = false;
-          let currentEvent = null;
-          let nextEvent = null;
-
-          const relevant = events
-            .map(vevent => new ICAL.Event(vevent))
-            .filter(ev => (ev.location || "").toLowerCase().includes(loc.toLowerCase()))
-            .sort((a,b) => a.startDate.toJSDate() - b.startDate.toJSDate());
-
-          for (let ev of relevant) {
-            const start = ev.startDate.toJSDate();
-            const end = ev.endDate.toJSDate();
-            if (start <= now && end >= now) {
-              isOccupied = true;
-              currentEvent = ev;
-            } else if (!nextEvent && start > now) {
-              nextEvent = ev;
-              break;
-            }
-          }
-
-          let lightClass = "gray";
-          let statusText = "CLOSED";
-          let statusColor = "#aaa";
-          let infoText = `Opens ${getNextOpening(now)}`;
-
-          if (isOpen) {
-            if (isOccupied && currentEvent) {
-              lightClass = "red";
-              statusText = "OCCUPIED";
-              statusColor = "#ff4444";
-              const endStr = currentEvent.endDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'});
-              infoText = `Available at ${endStr}`;
-            } else {
-              lightClass = "green";
-              statusText = "FREE";
-              statusColor = "#22ff44";
-              const nextStr = nextEvent 
-                ? nextEvent.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'})
-                : "close";
-              infoText = `Free until ${nextStr}`;
-            }
-          }
-
-          const tile = document.createElement("div");
-          tile.className = "tile";
-          tile.innerHTML = `
-            <div class="location">${loc}</div>
-            <div class="center">
-              <div class="light ${lightClass}"></div>
-              <div class="status" style="color:${statusColor}">${statusText}</div>
-            </div>
-            <div class="info">${infoText}</div>
-          `;
-          dashboard.appendChild(tile);
-        });
-
-        document.getElementById("lastUpdated").textContent =
-          `Last updated: ${now.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'numeric', minute:'2-digit'})} Central`;
-
-      } catch (err) {
-        console.error(err);
-        dashboard.innerHTML = `<p style="color:#ff6666;text-align:center;padding:20px;">Error loading data.<br>Try Refresh Now.</p>`;
+        if (!text) return [];
+        const jcalData = ICAL.parse(text);
+        return new ICAL.Component(jcalData).getAllSubcomponents("vevent");
+      } catch (e) {
+        console.error("Failed to load calendar:", url);
+        return [];
       }
+    }
+
+    async function loadDashboard() {
+      const indoorEvents = await fetchICS(INDOOR_ICS);
+      const outdoorEvents = await fetchICS(OUTDOOR_ICS);
+
+      const now = new Date();
+      const isOpen = isFacilityOpen(now);
+
+      renderSection("indoor", indoorLocations, indoorEvents, isOpen, now);
+      renderSection("outdoor", outdoorLocations, outdoorEvents, isOpen, now);
+
+      document.getElementById("lastUpdated").textContent = 
+        `Last updated: ${now.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'numeric', minute:'2-digit'})} Central`;
+    }
+
+    function renderSection(containerId, locations, events, isOpen, now) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+
+      locations.forEach(loc => {
+        let isOccupied = false;
+        let currentEvent = null;
+        let nextEvent = null;
+
+        const relevant = events
+          .map(vevent => new ICAL.Event(vevent))
+          .filter(ev => (ev.location || "").toLowerCase().includes(loc.toLowerCase()))
+          .sort((a,b) => a.startDate.toJSDate() - b.startDate.toJSDate());
+
+        for (let ev of relevant) {
+          const start = ev.startDate.toJSDate();
+          const end = ev.endDate.toJSDate();
+          if (start <= now && end >= now) {
+            isOccupied = true;
+            currentEvent = ev;
+          } else if (!nextEvent && start > now) {
+            nextEvent = ev;
+            break;
+          }
+        }
+
+        let lightClass = "gray", statusText = "CLOSED", statusColor = "#aaa", infoText = `Opens ${getNextOpening(now)}`;
+
+        if (isOpen) {
+          if (isOccupied && currentEvent) {
+            lightClass = "red";
+            statusText = "OCCUPIED";
+            statusColor = "#ff4444";
+            const endStr = currentEvent.endDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'});
+            infoText = `Available at ${endStr}`;
+          } else {
+            lightClass = "green";
+            statusText = "FREE";
+            statusColor = "#22ff44";
+            const nextStr = nextEvent 
+              ? nextEvent.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'})
+              : "close";
+            infoText = `Free until ${nextStr}`;
+          }
+        }
+
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.innerHTML = `
+          <div class="location">${loc}</div>
+          <div class="center">
+            <div class="light ${lightClass}"></div>
+            <div class="status" style="color:${statusColor}">${statusText}</div>
+          </div>
+          <div class="info">${infoText}</div>
+        `;
+        container.appendChild(tile);
+      });
     }
 
     setInterval(loadDashboard, 90000);
