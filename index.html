@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Facilities Live Status</title>
+  <script src="https://cdn.jsdelivr.net/npm/ical.js@2.1.0/build/ical.min.js"></script>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      background: #0a0a0a; 
+      color: #eee; 
+      text-align: center; 
+      padding: 20px; 
+      margin: 0;
+    }
+    h1 { color: #0f0; margin: 20px 0 30px; }
+    .grid { 
+      display: flex; 
+      flex-wrap: wrap; 
+      justify-content: center; 
+      gap: 30px; 
+      margin-top: 20px; 
+    }
+    .tile { 
+      background: #1f1f1f; 
+      padding: 30px; 
+      border-radius: 16px; 
+      width: 280px; 
+      border: 2px solid #333; 
+    }
+    .light { 
+      width: 130px; 
+      height: 130px; 
+      border-radius: 50%; 
+      margin: 20px auto; 
+      box-shadow: 0 0 45px currentColor; 
+      transition: all 0.4s;
+    }
+    .green { background: #22ff44; }
+    .red { background: #ff2222; }
+    button { 
+      padding: 14px 32px; 
+      font-size: 18px; 
+      background: #0f0; 
+      color: black; 
+      border: none; 
+      border-radius: 8px; 
+      cursor: pointer; 
+      margin: 15px;
+    }
+    .status { font-size: 1.6em; font-weight: bold; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>🏟️ MBU Sports Facilities - Live Status</h1>
+  <button onclick="loadDashboard()">🔄 Refresh Now</button>
+  <div id="dashboard" class="grid"></div>
+
+  <script>
+    const ICS_URL = "https://outlook.office365.com/owa/calendar/97967830e98945e38f6aaefb6042710b@mbu.edu/0521f667626a42ee90cfb1ff0222d6338862321817573157099/calendar.ics";
+
+    async function loadDashboard() {
+      const dashboard = document.getElementById("dashboard");
+      dashboard.innerHTML = "<p style='color:#ff0;'>Loading live data...</p>";
+
+      try {
+        const response = await fetch(ICS_URL);
+        if (!response.ok) throw new Error("Failed to load");
+
+        const icsText = await response.text();
+        const jcalData = ICAL.parse(icsText);
+        const comp = new ICAL.Component(jcalData);
+        const events = comp.getAllSubcomponents("vevent");
+
+        const now = new Date();
+        dashboard.innerHTML = "";
+
+        const locations = ["Main Gym", "FCG", "Weight Room"];
+
+        locations.forEach(loc => {
+          let isOccupied = false;
+
+          for (let vevent of events) {
+            const event = new ICAL.Event(vevent);
+            const locField = (event.location || "").toLowerCase();
+
+            if (locField.includes(loc.toLowerCase())) {
+              const start = event.startDate.toJSDate();
+              const end = event.endDate.toJSDate();
+              if (start <= now && end >= now) {
+                isOccupied = true;
+                break;
+              }
+            }
+          }
+
+          const tile = document.createElement("div");
+          tile.className = "tile";
+          tile.innerHTML = `
+            <h3>${loc}</h3>
+            <div class="light ${isOccupied ? 'red' : 'green'}"></div>
+            <div class="status" style="color:${isOccupied ? '#ff4444' : '#22ff44'}">
+              ${isOccupied ? '🔴 OCCUPIED' : '🟢 FREE NOW'}
+            </div>
+          `;
+          dashboard.appendChild(tile);
+        });
+
+      } catch (err) {
+        console.error(err);
+        dashboard.innerHTML = `<p style="color:red; padding:20px;">
+          Could not load calendar data.<br>
+          This usually works better when hosted on GitHub Pages.
+        </p>`;
+      }
+    }
+
+    // Auto refresh every 2 minutes
+    setInterval(loadDashboard, 120000);
+    window.onload = loadDashboard;
+  </script>
+</body>
+</html>
