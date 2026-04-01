@@ -22,11 +22,11 @@
       overflow-x: hidden;
     }
 
-    /* Watermarked SaberCats Logo - Moved Much Higher */
+    /* Watermarked Logo */
     body::before {
       content: "";
       position: fixed;
-      top: 120px;           /* Moved way up */
+      top: 120px;
       left: 50%;
       transform: translateX(-50%);
       width: 360px;
@@ -71,8 +71,8 @@
     .center { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .light { width: 48px; height: 48px; border-radius: 50%; box-shadow: 0 0 16px currentColor; }
     .green { background: #22ff44; }
-    .red   { background: #ff2222; }
-    .gray  { background: #888888; }
+    .red { background: #ff2222; }
+    .gray { background: #888888; }
     .status { font-size: 1.25em; font-weight: bold; }
     .info { font-size: 0.95em; opacity: 0.9; text-align: right; line-height: 1.3; }
 
@@ -103,6 +103,55 @@
       position: relative;
       z-index: 1;
     }
+
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-content {
+      background: #00263E;
+      border: 2px solid var(--gold);
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 380px;
+      width: 90%;
+      color: white;
+    }
+    .modal h2 {
+      color: var(--gold);
+      margin-top: 0;
+      text-align: center;
+    }
+    .hours-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .hours-table td {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    .hours-table td:first-child {
+      font-weight: bold;
+      width: 45%;
+      color: var(--gold);
+    }
+    .close-btn {
+      background: #ff4444;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 1.1em;
+      margin-top: 15px;
+      width: 100%;
+    }
   </style>
 </head>
 <body>
@@ -112,6 +161,23 @@
   </button>
   <div id="dashboard" class="grid"></div>
   <div id="lastUpdated" class="last-updated"></div>
+
+  <!-- Hours Button -->
+  <button onclick="showHours()">🕒 View Full Hours</button>
+
+  <!-- Modal -->
+  <div id="hoursModal" class="modal">
+    <div class="modal-content">
+      <h2>Facilities Hours of Operation</h2>
+      <table class="hours-table">
+        <tr><td>Monday – Friday</td><td>6:00 AM – 9:45 PM</td></tr>
+        <tr><td>Wednesday</td><td>6:00 AM – 5:00 PM<br>8:30 PM – 9:45 PM</td></tr>
+        <tr><td>Saturday</td><td>10:00 AM – 9:00 PM</td></tr>
+        <tr><td>Sunday</td><td>7:45 PM – 9:45 PM</td></tr>
+      </table>
+      <button class="close-btn" onclick="closeModal()">Close</button>
+    </div>
+  </div>
 
   <script>
     const ICS_URL = "https://outlook.office365.com/owa/calendar/97967830e98945e38f6aaefb6042710b@mbu.edu/0521f667626a42ee90cfb1ff0222d6338862321817573157099/calendar.ics";
@@ -123,9 +189,9 @@
       const currentMinutes = hour * 60 + minute;
 
       if (day === 3) { // Wednesday
-        const morningClose = 17 * 60;     // 5:00 PM
-        const eveningOpen  = 20 * 60 + 30; // 8:30 PM
-        const closeTime    = 21 * 60 + 45; // 9:45 PM
+        const morningClose = 17 * 60;
+        const eveningOpen = 20 * 60 + 30;
+        const closeTime = 21 * 60 + 45;
         return (currentMinutes >= 6*60 && currentMinutes < morningClose) ||
                (currentMinutes >= eveningOpen && currentMinutes <= closeTime);
       }
@@ -152,15 +218,24 @@
       return "tomorrow at 10:00 AM";
     }
 
+    function showHours() {
+      document.getElementById("hoursModal").style.display = "flex";
+    }
+
+    function closeModal() {
+      document.getElementById("hoursModal").style.display = "none";
+    }
+
+    // Rest of your loadDashboard function (unchanged)
     async function loadDashboard() {
       const dashboard = document.getElementById("dashboard");
       dashboard.innerHTML = "<p style='color:#F2C94C;text-align:center;padding:20px;'>Loading live data...</p>";
 
       try {
         let icsText;
-        try { 
-          const r = await fetch(ICS_URL); 
-          if (r.ok) icsText = await r.text(); 
+        try {
+          const r = await fetch(ICS_URL);
+          if (r.ok) icsText = await r.text();
         } catch(e){}
 
         if (!icsText) {
@@ -168,9 +243,9 @@
           for (let p of proxies) {
             try {
               const r = await fetch(p + encodeURIComponent(ICS_URL));
-              if (r.ok) { 
-                icsText = await r.text(); 
-                if (icsText.includes("BEGIN:VCALENDAR")) break; 
+              if (r.ok) {
+                icsText = await r.text();
+                if (icsText.includes("BEGIN:VCALENDAR")) break;
               }
             } catch(e){}
           }
@@ -244,7 +319,7 @@
           dashboard.appendChild(tile);
         });
 
-        document.getElementById("lastUpdated").textContent = 
+        document.getElementById("lastUpdated").textContent =
           `Last updated: ${now.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'numeric', minute:'2-digit'})} Central`;
 
       } catch (err) {
