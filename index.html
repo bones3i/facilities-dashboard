@@ -22,7 +22,6 @@
       overflow-x: hidden;
     }
 
-    /* Watermarked SaberCats Logo */
     body::before {
       content: "";
       position: fixed;
@@ -67,35 +66,14 @@
       z-index: 1;
     }
 
-    .location { 
-      font-size: 1.2em; 
-      font-weight: bold; 
-    }
-    .center { 
-      display: flex; 
-      flex-direction: column; 
-      align-items: center; 
-      gap: 4px; 
-    }
-    .light { 
-      width: 48px; 
-      height: 48px; 
-      border-radius: 50%; 
-      box-shadow: 0 0 16px currentColor; 
-    }
+    .location { font-size: 1.2em; font-weight: bold; }
+    .center { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .light { width: 48px; height: 48px; border-radius: 50%; box-shadow: 0 0 16px currentColor; }
     .green { background: #22ff44; }
     .red   { background: #ff2222; }
     .gray  { background: #888888; }
-    .status { 
-      font-size: 1.25em; 
-      font-weight: bold; 
-    }
-    .info { 
-      font-size: 0.95em; 
-      opacity: 0.9; 
-      text-align: right; 
-      line-height: 1.3; 
-    }
+    .status { font-size: 1.25em; font-weight: bold; }
+    .info { font-size: 0.95em; opacity: 0.9; text-align: right; line-height: 1.3; }
 
     button {
       background: var(--gold);
@@ -127,7 +105,7 @@
   </style>
 </head>
 <body>
-  <h1>MBU Gym Facilities Live</h1>
+  <h1>🏟️ MBU Facilities Live</h1>
   <button onclick="loadDashboard()">
     🔄 <span>Refresh Now</span>
   </button>
@@ -138,28 +116,41 @@
     const ICS_URL = "https://outlook.office365.com/owa/calendar/97967830e98945e38f6aaefb6042710b@mbu.edu/0521f667626a42ee90cfb1ff0222d6338862321817573157099/calendar.ics";
 
     function isFacilityOpen(now = new Date()) {
-      const day = now.getDay();
+      const day = now.getDay();           // 0=Sun, 1=Mon, ..., 6=Sat
       const hour = now.getHours();
       const minute = now.getMinutes();
-      const currentTime = hour * 60 + minute;
+      const currentMinutes = hour * 60 + minute;
 
+      // Wednesday special rule
+      if (day === 3) {                    // Wednesday
+        const morningClose = 17 * 60;     // 5:00 PM
+        const eveningOpen  = 20 * 60 + 30; // 8:30 PM
+        const closeTime    = 21 * 60 + 45; // 9:45 PM
+
+        // Open 6AM–5PM or 8:30PM–9:45PM
+        return (currentMinutes >= 6*60 && currentMinutes < morningClose) ||
+               (currentMinutes >= eveningOpen && currentMinutes <= closeTime);
+      }
+
+      // Normal days
       let openTime, closeTime;
-
-      if (day >= 1 && day <= 5) { // Monday–Friday
+      if (day >= 1 && day <= 5) {         // Monday–Friday (except Wed)
         openTime = 6 * 60;
         closeTime = 21 * 60 + 45;
-      } else if (day === 6) { // Saturday
+      } else if (day === 6) {             // Saturday
         openTime = 10 * 60;
         closeTime = 21 * 60;
-      } else { // Sunday
+      } else {                            // Sunday
         openTime = 19 * 60 + 45;
         closeTime = 21 * 60 + 45;
       }
-      return currentTime >= openTime && currentTime <= closeTime;
+
+      return currentMinutes >= openTime && currentMinutes <= closeTime;
     }
 
     function getNextOpening(now = new Date()) {
       const day = now.getDay();
+      if (day === 3) return "8:30 PM tonight";           // Wednesday evening
       if (day >= 1 && day <= 5) return "tomorrow at 6:00 AM";
       if (day === 6) return "tomorrow at 6:00 AM";
       return "tomorrow at 10:00 AM";
@@ -177,11 +168,7 @@
         } catch(e){}
 
         if (!icsText) {
-          const proxies = [
-            "https://api.allorigins.win/raw?url=", 
-            "https://corsproxy.io/?", 
-            "https://api.codetabs.com/v1/proxy?quest="
-          ];
+          const proxies = ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?", "https://api.codetabs.com/v1/proxy?quest="];
           for (let p of proxies) {
             try {
               const r = await fetch(p + encodeURIComponent(ICS_URL));
