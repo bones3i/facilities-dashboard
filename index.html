@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Facilities Live Status</title>
-  <script src="https://cdn.jsdelivr.net/npm/ical.js@2.1.0/build/ical.min.js"></script>
+  <!-- Correct ical.js library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ical.js/1.4.0/ical.min.js"></script>
   <style>
     body { 
       font-family: Arial, sans-serif; 
@@ -49,7 +50,7 @@
       margin: 15px;
     }
     .status { font-size: 1.6em; font-weight: bold; margin: 10px 0; }
-    .error { color: #ff6666; }
+    .error { color: #ff6666; padding: 20px; }
   </style>
 </head>
 <body>
@@ -60,36 +61,40 @@
   <script>
     const ICS_URL = "https://outlook.office365.com/owa/calendar/97967830e98945e38f6aaefb6042710b@mbu.edu/0521f667626a42ee90cfb1ff0222d6338862321817573157099/calendar.ics";
 
-    const proxies = [
-      "https://api.allorigins.win/raw?url=",
-      "https://corsproxy.io/?",
-      "https://proxy.cors.sh/",
-      "https://api.codetabs.com/v1/proxy?quest="
-    ];
-
-    async function tryFetchICS() {
-      for (let proxy of proxies) {
-        try {
-          const url = proxy + encodeURIComponent(ICS_URL);
-          const response = await fetch(url);
-          if (response.ok) {
-            const text = await response.text();
-            if (text.includes("BEGIN:VCALENDAR")) {
-              return text;
-            }
-          }
-        } catch (e) {}
-      }
-      throw new Error("All proxies failed");
-    }
-
     async function loadDashboard() {
       const dashboard = document.getElementById("dashboard");
       dashboard.innerHTML = "<p style='color:#ff0;'>Loading live calendar data...</p>";
 
       try {
-        const icsText = await tryFetchICS();
-        
+        // Try direct fetch first (works on GitHub Pages sometimes)
+        let icsText;
+        try {
+          const resp = await fetch(ICS_URL);
+          if (resp.ok) icsText = await resp.text();
+        } catch (e) {}
+
+        // If direct fails, try proxies
+        if (!icsText) {
+          const proxies = [
+            "https://api.allorigins.win/raw?url=",
+            "https://corsproxy.io/?",
+            "https://api.codetabs.com/v1/proxy?quest="
+          ];
+          for (let proxy of proxies) {
+            try {
+              const resp = await fetch(proxy + encodeURIComponent(ICS_URL));
+              if (resp.ok) {
+                icsText = await resp.text();
+                if (icsText.includes("BEGIN:VCALENDAR")) break;
+              }
+            } catch (e) {}
+          }
+        }
+
+        if (!icsText || !icsText.includes("BEGIN:VCALENDAR")) {
+          throw new Error("Could not load calendar");
+        }
+
         const jcalData = ICAL.parse(icsText);
         const comp = new ICAL.Component(jcalData);
         const events = comp.getAllSubcomponents("vevent");
@@ -131,13 +136,13 @@
       } catch (err) {
         console.error(err);
         dashboard.innerHTML = `<p class="error">
-          Still having trouble loading the calendar.<br><br>
-          Try clicking "Refresh Now" a couple of times.<br>
-          Or let me know and I'll give you another option.
+          Could not load calendar data right now.<br><br>
+          Click "Refresh Now" — it often works after 1-2 tries.
         </p>`;
       }
     }
 
+    // Auto refresh
     setInterval(loadDashboard, 120000);
     window.onload = loadDashboard;
   </script>
