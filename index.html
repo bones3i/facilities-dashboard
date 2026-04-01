@@ -17,61 +17,54 @@
       color: #fff;
       margin: 0;
       padding: 12px;
-      max-width: 420px; /* perfect for sidebar */
+      max-width: 420px;
       margin: 0 auto;
     }
     h1 {
       color: var(--gold);
-      font-size: 1.4em;
+      font-size: 1.45em;
       margin: 0 0 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
-    .grid {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
+    .grid { display: flex; flex-direction: column; gap: 14px; }
     .tile {
       background: rgba(255,255,255,0.08);
       border-radius: 12px;
-      padding: 14px;
+      padding: 16px;
       display: flex;
       align-items: center;
       gap: 14px;
       border: 1px solid rgba(255,255,255,0.1);
     }
-    .location {
-      flex: 1;
-      font-size: 1.15em;
-      font-weight: bold;
-    }
     .light {
-      width: 58px;
-      height: 58px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
       flex-shrink: 0;
-      box-shadow: 0 0 18px currentColor;
+      box-shadow: 0 0 15px currentColor;
     }
-    .green { background: #22ff44; color: #22ff44; }
-    .red   { background: #ff2222; color: #ff2222; }
+    .green { background: #22ff44; }
+    .red   { background: #ff2222; }
+    .gray  { background: #888888; }
+    .location {
+      flex: 1;
+      font-size: 1.2em;
+      font-weight: bold;
+    }
     .status {
-      font-size: 1.35em;
+      font-size: 1.3em;
       font-weight: bold;
       min-width: 110px;
     }
     .info {
       font-size: 0.95em;
-      opacity: 0.85;
-      margin-top: 4px;
-      display: block;
+      opacity: 0.9;
+      margin-top: 3px;
     }
     button {
       background: var(--gold);
       color: var(--navy);
       border: none;
-      padding: 10px 20px;
+      padding: 12px;
       font-weight: bold;
       border-radius: 8px;
       cursor: pointer;
@@ -82,12 +75,12 @@
       font-size: 0.85em;
       opacity: 0.7;
       text-align: center;
-      margin-top: 12px;
+      margin-top: 15px;
     }
   </style>
 </head>
 <body>
-  <h1>🏟️ MBU Facilities</h1>
+  <h1>🏟️ MBU Facilities Live</h1>
   <button onclick="loadDashboard()">🔄 Refresh Now</button>
   <div id="dashboard" class="grid"></div>
   <div id="lastUpdated" class="last-updated"></div>
@@ -95,13 +88,42 @@
   <script>
     const ICS_URL = "https://outlook.office365.com/owa/calendar/97967830e98945e38f6aaefb6042710b@mbu.edu/0521f667626a42ee90cfb1ff0222d6338862321817573157099/calendar.ics";
 
+    function isFacilityOpen(now = new Date()) {
+      const day = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      const currentTime = hour * 60 + minute;
+
+      let openTime, closeTime;
+
+      if (day >= 1 && day <= 5) { // Monday–Friday
+        openTime = 6 * 60;      // 6:00 AM
+        closeTime = 21 * 60 + 45; // 9:45 PM
+      } else if (day === 6) { // Saturday
+        openTime = 10 * 60;     // 10:00 AM
+        closeTime = 21 * 60;    // 9:00 PM
+      } else { // Sunday
+        openTime = 19 * 60 + 45; // 7:45 PM
+        closeTime = 21 * 60 + 45; // 9:45 PM
+      }
+
+      return currentTime >= openTime && currentTime <= closeTime;
+    }
+
+    function getNextOpening(now = new Date()) {
+      // Simple version - returns next opening time string
+      const day = now.getDay();
+      if (day >= 1 && day <= 5) return "tomorrow at 6:00 AM";
+      if (day === 6) return "tomorrow at 6:00 AM";
+      return "tomorrow at 10:00 AM"; // Sunday
+    }
+
     async function loadDashboard() {
       const dashboard = document.getElementById("dashboard");
-      dashboard.innerHTML = "<p style='color:#F2C94C;text-align:center;'>Loading live data…</p>";
+      dashboard.innerHTML = "<p style='color:#F2C94C;text-align:center;'>Loading...</p>";
 
       try {
         let icsText;
-        // Try direct + proxies
         try { const r = await fetch(ICS_URL); if (r.ok) icsText = await r.text(); } catch(e){}
         if (!icsText) {
           const proxies = ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?", "https://api.codetabs.com/v1/proxy?quest="];
@@ -118,27 +140,22 @@
         const events = comp.getAllSubcomponents("vevent");
 
         const now = new Date();
+        const isOpen = isFacilityOpen(now);
         dashboard.innerHTML = "";
 
         const locations = ["Main Gym", "FCG", "Weight Room"];
 
         locations.forEach(loc => {
+          let isOccupied = false;
           let currentEvent = null;
           let nextEvent = null;
-          let isOccupied = false;
 
-          // Find current and next events for this location
-          const relevantEvents = [];
-          events.forEach(vevent => {
-            const event = new ICAL.Event(vevent);
-            const locField = (event.location || "").toLowerCase();
-            if (locField.includes(loc.toLowerCase())) relevantEvents.push(event);
-          });
+          const relevant = events
+            .map(vevent => new ICAL.Event(vevent))
+            .filter(ev => (ev.location || "").toLowerCase().includes(loc.toLowerCase()))
+            .sort((a,b) => a.startDate.toJSDate() - b.startDate.toJSDate());
 
-          // Sort by start time
-          relevantEvents.sort((a,b) => a.startDate.toJSDate() - b.startDate.toJSDate());
-
-          for (let ev of relevantEvents) {
+          for (let ev of relevant) {
             const start = ev.startDate.toJSDate();
             const end = ev.endDate.toJSDate();
             if (start <= now && end >= now) {
@@ -150,60 +167,45 @@
             }
           }
 
-          // Build extra info text
+          let statusHTML = "";
           let infoText = "";
-          if (isOccupied && currentEvent) {
+
+          if (!isOpen) {
+            statusHTML = `<div class="light gray"></div><div class="status" style="color:#aaa;">CLOSED</div>`;
+            infoText = `Opens ${getNextOpening(now)}`;
+          } else if (isOccupied && currentEvent) {
             const endTime = currentEvent.endDate.toJSDate();
             const endStr = endTime.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'});
+            statusHTML = `<div class="light red"></div><div class="status" style="color:#ff4444;">OCCUPIED</div>`;
             infoText = `Available at ${endStr}`;
-            
-            // Look for next gap >=20 minutes
-            for (let i = 0; i < relevantEvents.length; i++) {
-              if (relevantEvents[i] === currentEvent) {
-                if (i + 1 < relevantEvents.length) {
-                  const nextStart = relevantEvents[i+1].startDate.toJSDate();
-                  const gapMin = Math.round((nextStart - endTime) / 60000);
-                  if (gapMin >= 20) {
-                    infoText += ` for ${gapMin} minutes`;
-                    break;
-                  }
-                }
-                break;
-              }
-            }
-          } else if (nextEvent) {
-            const startStr = nextEvent.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'});
-            infoText = `Free until ${startStr}`;
           } else {
-            infoText = "Free for the rest of the day";
+            const nextStr = nextEvent 
+              ? nextEvent.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'})
+              : "rest of day";
+            statusHTML = `<div class="light green"></div><div class="status" style="color:#22ff44;">FREE</div>`;
+            infoText = `Free until ${nextStr}`;
           }
 
           const tile = document.createElement("div");
           tile.className = "tile";
           tile.innerHTML = `
             <div class="location">${loc}</div>
-            <div class="light ${isOccupied ? 'red' : 'green'}"></div>
-            <div>
-              <div class="status" style="color:${isOccupied ? '#ff4444' : '#22ff44'}">
-                ${isOccupied ? '🔴 OCCUPIED' : '🟢 FREE'}
-              </div>
-              <span class="info">${infoText}</span>
-            </div>
+            ${statusHTML}
+            <div><span class="info">${infoText}</span></div>
           `;
           dashboard.appendChild(tile);
         });
 
-        // Last updated
-        const updatedEl = document.getElementById("lastUpdated");
-        updatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'numeric', minute:'2-digit'})} Central`;
+        document.getElementById("lastUpdated").textContent = 
+          `Last updated: ${now.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'numeric', minute:'2-digit'})} Central`;
 
       } catch (err) {
         console.error(err);
-        dashboard.innerHTML = `<p style="color:#ff6666;text-align:center;">Unable to load calendar.<br>Tap Refresh Now.</p>`;
+        dashboard.innerHTML = `<p style="color:#ff6666;text-align:center;">Error loading data.<br>Try Refresh.</p>`;
       }
     }
 
-    setInterval(loadDashboard, 90000); // every 90 seconds
+    setInterval(loadDashboard, 90000);
     window.onload = loadDashboard;
   </script>
 </body>
