@@ -6,10 +6,7 @@
   <title>MBU Facilities Live</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ical.js/1.4.0/ical.min.js"></script>
   <style>
-    :root {
-      --navy: #00263E;
-      --gold: #F2C94C;
-    }
+    :root { --navy: #00263E; --gold: #F2C94C; }
     body {
       font-family: Arial, sans-serif;
       background: var(--navy);
@@ -34,29 +31,9 @@
       z-index: 0;
       pointer-events: none;
     }
-    h1 {
-      color: var(--gold);
-      font-size: 1.5em;
-      margin: 8px 0 12px;
-      text-align: center;
-      position: relative;
-      z-index: 1;
-    }
-    .section-title {
-      color: var(--gold);
-      font-size: 1.25em;
-      margin: 20px 0 8px;
-      text-align: center;
-      position: relative;
-      z-index: 1;
-    }
-    .grid {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      position: relative;
-      z-index: 1;
-    }
+    h1 { color: var(--gold); font-size: 1.5em; margin: 8px 0 12px; text-align: center; position: relative; z-index: 1; }
+    .section-title { color: var(--gold); font-size: 1.25em; margin: 20px 0 8px; text-align: center; position: relative; z-index: 1; }
+    .grid { display: flex; flex-direction: column; gap: 12px; position: relative; z-index: 1; }
     .tile {
       background: rgba(255,255,255,0.2);
       border-radius: 12px;
@@ -97,18 +74,9 @@
       z-index: 1;
       transition: all 0.2s;
     }
-    button:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-    }
+    button:disabled { opacity: 0.7; cursor: not-allowed; }
 
-    .loading {
-      color: #F2C94C;
-      text-align: center;
-      padding: 30px 20px;
-      font-size: 1.1em;
-      min-height: 120px;
-    }
+    .loading { color: #F2C94C; text-align: center; padding: 30px 20px; font-size: 1.1em; min-height: 120px; }
 
     .last-updated, .disclaimer {
       font-size: 0.85em;
@@ -118,22 +86,9 @@
       position: relative;
       z-index: 1;
     }
-    .disclaimer {
-      font-style: italic;
-      padding: 10px 15px;
-      opacity: 0.65;
-    }
+    .disclaimer { font-style: italic; padding: 10px 15px; opacity: 0.65; }
 
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.85);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-    }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; }
     .modal-content {
       background: #00263E;
       border: 2px solid var(--gold);
@@ -162,7 +117,6 @@
 
   <button onclick="showHours()">🕒 View Full Hours</button>
 
-  <!-- Hours Modal -->
   <div id="hoursModal" class="modal">
     <div class="modal-content">
       <h2 style="color:var(--gold); text-align:center; margin-top:0;">Facilities Hours of Operation</h2>
@@ -172,10 +126,7 @@
         <tr><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">Saturday</td><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">10:00 AM – 9:00 PM</td></tr>
         <tr><td style="padding:8px 0;">Sunday</td><td style="padding:8px 0;">7:45 PM – 9:45 PM</td></tr>
       </table>
-      <button onclick="document.getElementById('hoursModal').style.display='none'" 
-              style="background:#ff4444; color:white; border:none; padding:12px; width:100%; border-radius:8px; margin-top:15px;">
-        Close
-      </button>
+      <button onclick="document.getElementById('hoursModal').style.display='none'" style="background:#ff4444; color:white; border:none; padding:12px; width:100%; border-radius:8px; margin-top:15px;">Close</button>
     </div>
   </div>
 
@@ -186,17 +137,28 @@
     const indoorLocations = ["Main Gym", "FCG", "Weight Room"];
     const outdoorLocations = ["ACAD Field", "Quad", "Division"];
 
-    // Improved location matching - handles structured location objects and multiple values
+    // Enhanced location extraction for Outlook ICS
     function getLocationText(event) {
       if (!event) return "";
-      
-      // Try common ways Outlook/ical.js stores location
-      if (typeof event.location === "string") return event.location;
-      if (event.location && event.location.value) return event.location.value;
-      if (event.location && event.location.val) return event.location.val;
-      
-      // Fallback: try toString()
-      return String(event.location || "");
+
+      let loc = "";
+
+      // Try standard string
+      if (typeof event.location === "string") loc = event.location;
+
+      // Try structured location object (common in Outlook)
+      else if (event.location && typeof event.location === "object") {
+        loc = event.location.value || event.location.val || event.location.toString() || "";
+      }
+
+      // Fallback: look directly on the vevent component
+      else if (event.component) {
+        const locProp = event.component.getFirstPropertyValue("location");
+        if (locProp) loc = locProp;
+      }
+
+      console.log(`Event "${event.summary || 'no summary'}" → Raw location:`, event.location, "→ Extracted:", loc);
+      return loc;
     }
 
     function locationMatches(eventLocationText, targetLoc) {
@@ -206,33 +168,30 @@
 
       if (text.includes(target)) return true;
 
-      // Handle multiple locations separated by commas, "and", "&", etc.
       const separators = [',', ';', ' and ', ' & ', '+', '/'];
       for (let sep of separators) {
         if (text.includes(sep)) {
           const parts = text.split(sep).map(p => p.trim());
-          if (parts.some(part => part === target || part.includes(target))) {
-            return true;
-          }
+          if (parts.some(part => part === target || part.includes(target))) return true;
         }
       }
       return false;
     }
+
+    // ... (keep your isFacilityOpen, getNextOpening, showHours, fetchICS functions exactly as they are) ...
 
     function isFacilityOpen(now = new Date()) {
       const day = now.getDay();
       const hour = now.getHours();
       const minute = now.getMinutes();
       const currentMinutes = hour * 60 + minute;
-
-      if (day === 3) { // Wednesday
+      if (day === 3) {
         const morningClose = 17 * 60;
         const eveningOpen = 20 * 60 + 30;
         const closeTime = 21 * 60 + 45;
         return (currentMinutes >= 6*60 && currentMinutes < morningClose) ||
                (currentMinutes >= eveningOpen && currentMinutes <= closeTime);
       }
-
       let openTime, closeTime;
       if (day >= 1 && day <= 5) {
         openTime = 6 * 60;
@@ -384,16 +343,6 @@
         `;
         container.appendChild(tile);
       });
-    }
-
-    // Helper to extract location text from structured or plain field
-    function getLocationText(event) {
-      if (!event) return "";
-      if (typeof event.location === "string") return event.location;
-      if (event.location && typeof event.location === "object") {
-        return event.location.value || event.location.val || "";
-      }
-      return "";
     }
 
     setInterval(loadDashboard, 90000);
