@@ -186,18 +186,53 @@
     const indoorLocations = ["Main Gym", "FCG", "Weight Room"];
     const outdoorLocations = ["ACAD Field", "Quad", "Division"];
 
+    // Improved location matching - handles structured location objects and multiple values
+    function getLocationText(event) {
+      if (!event) return "";
+      
+      // Try common ways Outlook/ical.js stores location
+      if (typeof event.location === "string") return event.location;
+      if (event.location && event.location.value) return event.location.value;
+      if (event.location && event.location.val) return event.location.val;
+      
+      // Fallback: try toString()
+      return String(event.location || "");
+    }
+
+    function locationMatches(eventLocationText, targetLoc) {
+      if (!eventLocationText) return false;
+      const target = targetLoc.toLowerCase().trim();
+      const text = eventLocationText.toLowerCase().trim();
+
+      if (text.includes(target)) return true;
+
+      // Handle multiple locations separated by commas, "and", "&", etc.
+      const separators = [',', ';', ' and ', ' & ', '+', '/'];
+      for (let sep of separators) {
+        if (text.includes(sep)) {
+          const parts = text.split(sep).map(p => p.trim());
+          if (parts.some(part => part === target || part.includes(target))) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
     function isFacilityOpen(now = new Date()) {
       const day = now.getDay();
       const hour = now.getHours();
       const minute = now.getMinutes();
       const currentMinutes = hour * 60 + minute;
-      if (day === 3) {
+
+      if (day === 3) { // Wednesday
         const morningClose = 17 * 60;
         const eveningOpen = 20 * 60 + 30;
         const closeTime = 21 * 60 + 45;
         return (currentMinutes >= 6*60 && currentMinutes < morningClose) ||
                (currentMinutes >= eveningOpen && currentMinutes <= closeTime);
       }
+
       let openTime, closeTime;
       if (day >= 1 && day <= 5) {
         openTime = 6 * 60;
@@ -257,7 +292,6 @@
       const indoorContainer = document.getElementById("indoor");
       const outdoorContainer = document.getElementById("outdoor");
 
-      // Visual feedback: disable button and show refreshing state
       refreshBtn.disabled = true;
       refreshBtn.innerHTML = `🔄 Refreshing...`;
 
@@ -281,9 +315,8 @@
 
       } catch (err) {
         console.error(err);
-        indoorContainer.innerHTML = '<p style="color:#ff6666;text-align:center;padding:20px;">Error loading calendars.<br>Please try again.</p>';
+        indoorContainer.innerHTML = '<p style="color:#ff6666;text-align:center;padding:20px;">Error loading calendars.<br>Please try Refresh Now.</p>';
       } finally {
-        // Restore button
         refreshBtn.disabled = false;
         refreshBtn.innerHTML = `🔄 Refresh Now`;
       }
@@ -300,7 +333,10 @@
 
         const relevant = events
           .map(vevent => new ICAL.Event(vevent))
-          .filter(ev => locationMatches(ev.location || "", loc))
+          .filter(ev => {
+            const locText = getLocationText(ev);
+            return locationMatches(locText, loc);
+          })
           .sort((a,b) => a.startDate.toJSDate() - b.startDate.toJSDate());
 
         for (let ev of relevant) {
@@ -350,21 +386,14 @@
       });
     }
 
-    function locationMatches(eventLocation, targetLoc) {
-      if (!eventLocation) return false;
-      const target = targetLoc.toLowerCase().trim();
-      const locText = eventLocation.toLowerCase();
-
-      if (locText.includes(target)) return true;
-
-      const separators = [',', ';', ' and ', ' & ', '+', '/'];
-      for (let sep of separators) {
-        if (locText.includes(sep)) {
-          const parts = locText.split(sep).map(p => p.trim());
-          if (parts.some(part => part === target || part.includes(target))) return true;
-        }
+    // Helper to extract location text from structured or plain field
+    function getLocationText(event) {
+      if (!event) return "";
+      if (typeof event.location === "string") return event.location;
+      if (event.location && typeof event.location === "object") {
+        return event.location.value || event.location.val || "";
       }
-      return false;
+      return "";
     }
 
     setInterval(loadDashboard, 90000);
