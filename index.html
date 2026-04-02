@@ -21,7 +21,6 @@
       position: relative;
       overflow-x: hidden;
     }
-
     body::before {
       content: "";
       position: fixed;
@@ -35,7 +34,6 @@
       z-index: 0;
       pointer-events: none;
     }
-
     h1 {
       color: var(--gold);
       font-size: 1.5em;
@@ -44,7 +42,6 @@
       position: relative;
       z-index: 1;
     }
-
     .section-title {
       color: var(--gold);
       font-size: 1.25em;
@@ -53,15 +50,13 @@
       position: relative;
       z-index: 1;
     }
-
-    .grid { 
-      display: flex; 
-      flex-direction: column; 
-      gap: 12px; 
+    .grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
       position: relative;
       z-index: 1;
     }
-
     .tile {
       background: rgba(255,255,255,0.2);
       border-radius: 12px;
@@ -74,7 +69,6 @@
       position: relative;
       z-index: 1;
     }
-
     .location { font-size: 1.2em; font-weight: bold; }
     .center { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .light { width: 48px; height: 48px; border-radius: 50%; box-shadow: 0 0 16px currentColor; }
@@ -101,6 +95,19 @@
       gap: 12px;
       position: relative;
       z-index: 1;
+      transition: all 0.2s;
+    }
+    button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .loading {
+      color: #F2C94C;
+      text-align: center;
+      padding: 30px 20px;
+      font-size: 1.1em;
+      min-height: 120px;
     }
 
     .last-updated, .disclaimer {
@@ -111,14 +118,12 @@
       position: relative;
       z-index: 1;
     }
-
     .disclaimer {
       font-style: italic;
       padding: 10px 15px;
       opacity: 0.65;
     }
 
-    /* Modal */
     .modal {
       display: none;
       position: fixed;
@@ -142,7 +147,7 @@
 </head>
 <body>
   <h1>MBU Gym Facilities Live</h1>
-  <button onclick="loadDashboard()">🔄 Refresh Now</button>
+  <button id="refreshBtn" onclick="loadDashboard()">🔄 Refresh Now</button>
 
   <div class="section-title">Indoor Facilities</div>
   <div id="indoor" class="grid"></div>
@@ -186,15 +191,13 @@
       const hour = now.getHours();
       const minute = now.getMinutes();
       const currentMinutes = hour * 60 + minute;
-
-      if (day === 3) { // Wednesday
+      if (day === 3) {
         const morningClose = 17 * 60;
         const eveningOpen = 20 * 60 + 30;
         const closeTime = 21 * 60 + 45;
         return (currentMinutes >= 6*60 && currentMinutes < morningClose) ||
                (currentMinutes >= eveningOpen && currentMinutes <= closeTime);
       }
-
       let openTime, closeTime;
       if (day >= 1 && day <= 5) {
         openTime = 6 * 60;
@@ -228,7 +231,6 @@
           const r = await fetch(url);
           if (r.ok) text = await r.text();
         } catch(e){}
-
         if (!text) {
           const proxies = ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?", "https://api.codetabs.com/v1/proxy?quest="];
           for (let p of proxies) {
@@ -251,17 +253,40 @@
     }
 
     async function loadDashboard() {
-      const indoorEvents = await fetchICS(INDOOR_ICS);
-      const outdoorEvents = await fetchICS(OUTDOOR_ICS);
+      const refreshBtn = document.getElementById("refreshBtn");
+      const indoorContainer = document.getElementById("indoor");
+      const outdoorContainer = document.getElementById("outdoor");
 
-      const now = new Date();
-      const isOpen = isFacilityOpen(now);
+      // Visual feedback: disable button and show refreshing state
+      refreshBtn.disabled = true;
+      refreshBtn.innerHTML = `🔄 Refreshing...`;
 
-      renderSection("indoor", indoorLocations, indoorEvents, isOpen, now);
-      renderSection("outdoor", outdoorLocations, outdoorEvents, isOpen, now);
+      indoorContainer.innerHTML = '<p class="loading">Loading data from calendars...</p>';
+      outdoorContainer.innerHTML = '';
 
-      document.getElementById("lastUpdated").textContent = 
-        `Last updated: ${now.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'numeric', minute:'2-digit'})} Central`;
+      try {
+        const [indoorEvents, outdoorEvents] = await Promise.all([
+          fetchICS(INDOOR_ICS),
+          fetchICS(OUTDOOR_ICS)
+        ]);
+
+        const now = new Date();
+        const isOpen = isFacilityOpen(now);
+
+        renderSection("indoor", indoorLocations, indoorEvents, isOpen, now);
+        renderSection("outdoor", outdoorLocations, outdoorEvents, isOpen, now);
+
+        document.getElementById("lastUpdated").textContent = 
+          `Last updated: ${now.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'numeric', minute:'2-digit'})} Central`;
+
+      } catch (err) {
+        console.error(err);
+        indoorContainer.innerHTML = '<p style="color:#ff6666;text-align:center;padding:20px;">Error loading calendars.<br>Please try again.</p>';
+      } finally {
+        // Restore button
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = `🔄 Refresh Now`;
+      }
     }
 
     function renderSection(containerId, locations, events, isOpen, now) {
@@ -275,7 +300,7 @@
 
         const relevant = events
           .map(vevent => new ICAL.Event(vevent))
-          .filter(ev => (ev.location || "").toLowerCase().includes(loc.toLowerCase()))
+          .filter(ev => locationMatches(ev.location || "", loc))
           .sort((a,b) => a.startDate.toJSDate() - b.startDate.toJSDate());
 
         for (let ev of relevant) {
@@ -284,6 +309,7 @@
           if (start <= now && end >= now) {
             isOccupied = true;
             currentEvent = ev;
+            break;
           } else if (!nextEvent && start > now) {
             nextEvent = ev;
             break;
@@ -322,6 +348,23 @@
         `;
         container.appendChild(tile);
       });
+    }
+
+    function locationMatches(eventLocation, targetLoc) {
+      if (!eventLocation) return false;
+      const target = targetLoc.toLowerCase().trim();
+      const locText = eventLocation.toLowerCase();
+
+      if (locText.includes(target)) return true;
+
+      const separators = [',', ';', ' and ', ' & ', '+', '/'];
+      for (let sep of separators) {
+        if (locText.includes(sep)) {
+          const parts = locText.split(sep).map(p => p.trim());
+          if (parts.some(part => part === target || part.includes(target))) return true;
+        }
+      }
+      return false;
     }
 
     setInterval(loadDashboard, 90000);
