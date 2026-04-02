@@ -72,11 +72,16 @@
       gap: 12px;
       position: relative;
       z-index: 1;
-      transition: all 0.2s;
     }
     button:disabled { opacity: 0.7; cursor: not-allowed; }
 
-    .loading { color: #F2C94C; text-align: center; padding: 30px 20px; font-size: 1.1em; min-height: 120px; }
+    .loading { 
+      color: #F2C94C; 
+      text-align: center; 
+      padding: 40px 20px; 
+      font-size: 1.1em; 
+      min-height: 140px; 
+    }
 
     .last-updated, .disclaimer {
       font-size: 0.85em;
@@ -137,28 +142,18 @@
     const indoorLocations = ["Main Gym", "FCG", "Weight Room"];
     const outdoorLocations = ["ACAD Field", "Quad", "Division"];
 
-    // Enhanced location extraction for Outlook ICS
+    // Enhanced location extraction
     function getLocationText(event) {
       if (!event) return "";
-
-      let loc = "";
-
-      // Try standard string
-      if (typeof event.location === "string") loc = event.location;
-
-      // Try structured location object (common in Outlook)
-      else if (event.location && typeof event.location === "object") {
-        loc = event.location.value || event.location.val || event.location.toString() || "";
+      if (typeof event.location === "string") return event.location;
+      if (event.location && typeof event.location === "object") {
+        return event.location.value || event.location.val || event.location.toString() || "";
       }
-
-      // Fallback: look directly on the vevent component
-      else if (event.component) {
+      if (event.component) {
         const locProp = event.component.getFirstPropertyValue("location");
-        if (locProp) loc = locProp;
+        if (locProp) return locProp;
       }
-
-      console.log(`Event "${event.summary || 'no summary'}" → Raw location:`, event.location, "→ Extracted:", loc);
-      return loc;
+      return "";
     }
 
     function locationMatches(eventLocationText, targetLoc) {
@@ -177,8 +172,6 @@
       }
       return false;
     }
-
-    // ... (keep your isFacilityOpen, getNextOpening, showHours, fetchICS functions exactly as they are) ...
 
     function isFacilityOpen(now = new Date()) {
       const day = now.getDay();
@@ -219,31 +212,28 @@
     }
 
     async function fetchICS(url) {
-      try {
-        let text;
+      const proxies = [
+        "https://api.allorigins.win/raw?url=",
+        "https://corsproxy.io/?",
+        "https://api.codetabs.com/v1/proxy?quest="
+      ];
+
+      for (let proxy of proxies) {
         try {
-          const r = await fetch(url);
-          if (r.ok) text = await r.text();
-        } catch(e){}
-        if (!text) {
-          const proxies = ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?", "https://api.codetabs.com/v1/proxy?quest="];
-          for (let p of proxies) {
-            try {
-              const r = await fetch(p + encodeURIComponent(url));
-              if (r.ok) {
-                text = await r.text();
-                if (text.includes("BEGIN:VCALENDAR")) break;
-              }
-            } catch(e){}
+          const response = await fetch(proxy + encodeURIComponent(url), { cache: "no-store" });
+          if (response.ok) {
+            const text = await response.text();
+            if (text.includes("BEGIN:VCALENDAR")) {
+              console.log(`✅ Loaded via ${proxy}`);
+              return new ICAL.Component(ICAL.parse(text)).getAllSubcomponents("vevent");
+            }
           }
+        } catch (e) {
+          console.log(`Proxy ${proxy} failed`);
         }
-        if (!text) return [];
-        const jcalData = ICAL.parse(text);
-        return new ICAL.Component(jcalData).getAllSubcomponents("vevent");
-      } catch (e) {
-        console.error("Failed to load calendar:", url);
-        return [];
       }
+      console.error("❌ All proxies failed for", url);
+      return [];
     }
 
     async function loadDashboard() {
@@ -254,8 +244,8 @@
       refreshBtn.disabled = true;
       refreshBtn.innerHTML = `🔄 Refreshing...`;
 
-      indoorContainer.innerHTML = '<p class="loading">Loading data from calendars...</p>';
-      outdoorContainer.innerHTML = '';
+      indoorContainer.innerHTML = '<p class="loading">Loading indoor calendar...</p>';
+      outdoorContainer.innerHTML = '<p class="loading">Loading outdoor calendar...</p>';
 
       try {
         const [indoorEvents, outdoorEvents] = await Promise.all([
@@ -274,7 +264,8 @@
 
       } catch (err) {
         console.error(err);
-        indoorContainer.innerHTML = '<p style="color:#ff6666;text-align:center;padding:20px;">Error loading calendars.<br>Please try Refresh Now.</p>';
+        indoorContainer.innerHTML = '<p style="color:#ff6666;text-align:center;padding:20px;">Failed to load calendars.<br>Please try Refresh Now.</p>';
+        outdoorContainer.innerHTML = '';
       } finally {
         refreshBtn.disabled = false;
         refreshBtn.innerHTML = `🔄 Refresh Now`;
@@ -345,7 +336,20 @@
       });
     }
 
-    setInterval(loadDashboard, 90000);
+    function getLocationText(event) {
+      if (!event) return "";
+      if (typeof event.location === "string") return event.location;
+      if (event.location && typeof event.location === "object") {
+        return event.location.value || event.location.val || event.location.toString() || "";
+      }
+      if (event.component) {
+        const locProp = event.component.getFirstPropertyValue("location");
+        if (locProp) return locProp;
+      }
+      return "";
+    }
+
+    setInterval(loadDashboard, 120000); // 2 minutes
     window.onload = loadDashboard;
   </script>
 </body>
