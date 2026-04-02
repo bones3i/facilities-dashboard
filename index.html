@@ -16,7 +16,6 @@
       max-width: 460px;
       margin: 0 auto;
       position: relative;
-      overflow-x: hidden;
     }
     body::before {
       content: "";
@@ -31,8 +30,8 @@
       z-index: 0;
       pointer-events: none;
     }
-    h1 { color: var(--gold); font-size: 1.5em; margin: 8px 0 12px; text-align: center; position: relative; z-index: 1; }
-    .section-title { color: var(--gold); font-size: 1.25em; margin: 20px 0 8px; text-align: center; position: relative; z-index: 1; }
+    h1 { color: var(--gold); font-size: 1.5em; margin: 8px 0 12px; text-align: center; z-index: 1; position: relative; }
+    .section-title { color: var(--gold); font-size: 1.25em; margin: 20px 0 8px; text-align: center; z-index: 1; position: relative; }
     .grid { display: flex; flex-direction: column; gap: 12px; position: relative; z-index: 1; }
     .tile {
       background: rgba(255,255,255,0.2);
@@ -70,8 +69,6 @@
       align-items: center;
       justify-content: center;
       gap: 12px;
-      position: relative;
-      z-index: 1;
     }
     button:disabled { opacity: 0.7; cursor: not-allowed; }
 
@@ -142,7 +139,7 @@
     const indoorLocations = ["Main Gym", "FCG", "Weight Room"];
     const outdoorLocations = ["ACAD Field", "Quad", "Division"];
 
-    // Enhanced location extraction
+    // Improved location extraction
     function getLocationText(event) {
       if (!event) return "";
       if (typeof event.location === "string") return event.location;
@@ -213,18 +210,19 @@
 
     async function fetchICS(url) {
       const proxies = [
-        "https://api.allorigins.win/raw?url=",
+        "https://cors.bridged.cc/",           // Currently more reliable for Outlook
         "https://corsproxy.io/?",
         "https://api.codetabs.com/v1/proxy?quest="
       ];
 
       for (let proxy of proxies) {
         try {
-          const response = await fetch(proxy + encodeURIComponent(url), { cache: "no-store" });
+          const fullUrl = proxy + encodeURIComponent(url);
+          const response = await fetch(fullUrl);
           if (response.ok) {
             const text = await response.text();
-            if (text.includes("BEGIN:VCALENDAR")) {
-              console.log(`✅ Loaded via ${proxy}`);
+            if (text && text.includes("BEGIN:VCALENDAR")) {
+              console.log(`✅ Successfully loaded via ${proxy}`);
               return new ICAL.Component(ICAL.parse(text)).getAllSubcomponents("vevent");
             }
           }
@@ -283,10 +281,7 @@
 
         const relevant = events
           .map(vevent => new ICAL.Event(vevent))
-          .filter(ev => {
-            const locText = getLocationText(ev);
-            return locationMatches(locText, loc);
-          })
+          .filter(ev => locationMatches(getLocationText(ev), loc))
           .sort((a,b) => a.startDate.toJSDate() - b.startDate.toJSDate());
 
         for (let ev of relevant) {
@@ -349,7 +344,7 @@
       return "";
     }
 
-    setInterval(loadDashboard, 120000); // 2 minutes
+    setInterval(loadDashboard, 120000);
     window.onload = loadDashboard;
   </script>
 </body>
