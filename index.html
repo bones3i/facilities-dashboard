@@ -125,10 +125,7 @@
         <tr><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">Saturday</td><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">10:00 AM – 9:00 PM</td></tr>
         <tr><td style="padding:8px 0;">Sunday</td><td style="padding:8px 0;">7:45 PM – 9:45 PM</td></tr>
       </table>
-      <button onclick="document.getElementById('hoursModal').style.display='none'" 
-              style="background:#ff4444;color:white;border:none;padding:12px;width:100%;border-radius:8px;margin-top:15px;">
-        Close
-      </button>
+      <button onclick="document.getElementById('hoursModal').style.display='none'" style="background:#ff4444;color:white;border:none;padding:12px;width:100%;border-radius:8px;margin-top:15px;">Close</button>
     </div>
   </div>
 
@@ -159,8 +156,15 @@
       const target = targetLoc.toLowerCase().trim();
       const text = eventLocationText.toLowerCase().trim();
 
+      // Direct match
       if (text.includes(target)) return true;
 
+      // Extra flexible matching for outdoor locations
+      if (target === "acad field" && (text.includes("acad") || text.includes("field"))) return true;
+      if (target === "quad" && text.includes("quad")) return true;
+      if (target === "division" && text.includes("division")) return true;
+
+      // General multi-location handling
       const separators = [',', ';', ' and ', ' & ', '+', '/'];
       for (let sep of separators) {
         if (text.includes(sep)) {
@@ -239,11 +243,13 @@
           fetchICS(OUTDOOR_ICS)
         ]);
 
+        const allEvents = [...indoorEvents, ...outdoorEvents];
+
         const now = new Date();
         const isOpen = isFacilityOpen(now);
 
-        renderSection("indoor", indoorLocations, indoorEvents, isOpen, now);
-        renderSection("outdoor", outdoorLocations, outdoorEvents, isOpen, now);
+        renderSection("indoor", indoorLocations, allEvents, isOpen, now);
+        renderSection("outdoor", outdoorLocations, allEvents, isOpen, now);
 
         document.getElementById("lastUpdated").textContent = 
           `Last updated: ${now.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'numeric', minute:'2-digit'})} Central`;
