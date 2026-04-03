@@ -156,15 +156,12 @@
       const target = targetLoc.toLowerCase().trim();
       const text = eventLocationText.toLowerCase().trim();
 
-      // Direct match
       if (text.includes(target)) return true;
 
-      // Extra flexible matching for outdoor locations
       if (target === "acad field" && (text.includes("acad") || text.includes("field"))) return true;
       if (target === "quad" && text.includes("quad")) return true;
       if (target === "division" && text.includes("division")) return true;
 
-      // General multi-location handling
       const separators = [',', ';', ' and ', ' & ', '+', '/'];
       for (let sep of separators) {
         if (text.includes(sep)) {
@@ -248,8 +245,8 @@
         const now = new Date();
         const isOpen = isFacilityOpen(now);
 
-        renderSection("indoor", indoorLocations, allEvents, isOpen, now);
-        renderSection("outdoor", outdoorLocations, allEvents, isOpen, now);
+        renderSection("indoor", indoorLocations, allEvents, isOpen, now, true);   // indoor = use full hours logic
+        renderSection("outdoor", outdoorLocations, allEvents, isOpen, now, false); // outdoor = simplified logic
 
         document.getElementById("lastUpdated").textContent = 
           `Last updated: ${now.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'numeric', minute:'2-digit'})} Central`;
@@ -263,7 +260,7 @@
       }
     }
 
-    function renderSection(containerId, locations, events, isOpen, now) {
+    function renderSection(containerId, locations, events, isOpen, now, useFullHours) {
       const container = document.getElementById(containerId);
       container.innerHTML = "";
 
@@ -303,10 +300,22 @@
             lightClass = "green";
             statusText = "FREE";
             statusColor = "#22ff44";
-            const nextStr = nextEvent 
-              ? nextEvent.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'})
-              : "close";
-            infoText = `Free until ${nextStr}`;
+
+            if (useFullHours) {
+              // Indoor: show "Free until..." or "close"
+              const nextStr = nextEvent 
+                ? nextEvent.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'})
+                : "close";
+              infoText = `Free until ${nextStr}`;
+            } else {
+              // Outdoor: simplified - only show next event if it exists today, otherwise just "FREE"
+              if (nextEvent) {
+                const nextStr = nextEvent.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'});
+                infoText = `Free until ${nextStr}`;
+              } else {
+                infoText = "FREE";
+              }
+            }
           }
         }
 
