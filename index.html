@@ -245,8 +245,8 @@
         const now = new Date();
         const isOpen = isFacilityOpen(now);
 
-        renderSection("indoor", indoorLocations, allEvents, isOpen, now, true);   // indoor = use full hours logic
-        renderSection("outdoor", outdoorLocations, allEvents, isOpen, now, false); // outdoor = simplified logic
+        renderSection("indoor", indoorLocations, allEvents, isOpen, now, true);   // Indoor: full logic
+        renderSection("outdoor", outdoorLocations, allEvents, isOpen, now, false); // Outdoor: simplified
 
         document.getElementById("lastUpdated").textContent = 
           `Last updated: ${now.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'numeric', minute:'2-digit'})} Central`;
@@ -267,7 +267,7 @@
       locations.forEach(loc => {
         let isOccupied = false;
         let currentEvent = null;
-        let nextEvent = null;
+        let nextEventToday = null;
 
         const relevant = events
           .map(vevent => new ICAL.Event(vevent))
@@ -281,8 +281,10 @@
             isOccupied = true;
             currentEvent = ev;
             break;
-          } else if (!nextEvent && start > now) {
-            nextEvent = ev;
+          } 
+          // Only consider next event if it's still TODAY
+          else if (!nextEventToday && start > now && start.getDate() === now.getDate()) {
+            nextEventToday = ev;
             break;
           }
         }
@@ -302,15 +304,15 @@
             statusColor = "#22ff44";
 
             if (useFullHours) {
-              // Indoor: show "Free until..." or "close"
-              const nextStr = nextEvent 
-                ? nextEvent.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'})
+              // Indoor: always show "Free until..."
+              const nextStr = nextEventToday 
+                ? nextEventToday.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'})
                 : "close";
               infoText = `Free until ${nextStr}`;
             } else {
-              // Outdoor: simplified - only show next event if it exists today, otherwise just "FREE"
-              if (nextEvent) {
-                const nextStr = nextEvent.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'});
+              // Outdoor: only show time if there's another event TODAY
+              if (nextEventToday) {
+                const nextStr = nextEventToday.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'});
                 infoText = `Free until ${nextStr}`;
               } else {
                 infoText = "FREE";
