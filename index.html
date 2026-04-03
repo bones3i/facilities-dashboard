@@ -125,7 +125,10 @@
         <tr><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">Saturday</td><td style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.2);">10:00 AM – 9:00 PM</td></tr>
         <tr><td style="padding:8px 0;">Sunday</td><td style="padding:8px 0;">7:45 PM – 9:45 PM</td></tr>
       </table>
-      <button onclick="document.getElementById('hoursModal').style.display='none'" style="background:#ff4444;color:white;border:none;padding:12px;width:100%;border-radius:8px;margin-top:15px;">Close</button>
+      <button onclick="document.getElementById('hoursModal').style.display='none'" 
+              style="background:#ff4444;color:white;border:none;padding:12px;width:100%;border-radius:8px;margin-top:15px;">
+        Close
+      </button>
     </div>
   </div>
 
@@ -155,6 +158,7 @@
       if (!eventLocationText) return false;
       const target = targetLoc.toLowerCase().trim();
       const text = eventLocationText.toLowerCase().trim();
+
       if (text.includes(target)) return true;
 
       const separators = [',', ';', ' and ', ' & ', '+', '/'];
