@@ -260,80 +260,104 @@
       }
     }
 
-    function renderSection(containerId, locations, events, isOpen, now, useFullHours) {
-      const container = document.getElementById(containerId);
-      container.innerHTML = "";
+function renderSection(containerId, locations, events, isOpen, now, useFullHours) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
 
-      locations.forEach(loc => {
-        let isOccupied = false;
-        let currentEvent = null;
-        let nextEventToday = null;
+  // Helper: is the event on the same calendar day as "now"?
+  function isSameDay(date1, date2) {
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate();
+  }
 
-        const relevant = events
-          .map(vevent => new ICAL.Event(vevent))
-          .filter(ev => locationMatches(getLocationText(ev), loc))
-          .sort((a,b) => a.startDate.toJSDate() - b.startDate.toJSDate());
+  locations.forEach(loc => {
+    let isOccupied = false;
+    let currentEvent = null;
+    let nextEventToday = null;
 
-        for (let ev of relevant) {
-          const start = ev.startDate.toJSDate();
-          const end = ev.endDate.toJSDate();
-          if (start <= now && end >= now) {
-            isOccupied = true;
-            currentEvent = ev;
-            break;
-          } 
-          // Only consider next event if it's still TODAY
-          else if (!nextEventToday && start > now && start.getDate() === now.getDate()) {
-            nextEventToday = ev;
-            break;
-          }
-        }
+    const relevant = events
+      .map(vevent => new ICAL.Event(vevent))
+      .filter(ev => locationMatches(getLocationText(ev), loc))
+      .sort((a, b) => a.startDate.toJSDate() - b.startDate.toJSDate());
 
-        let lightClass = "gray", statusText = "CLOSED", statusColor = "#aaa", infoText = `Opens ${getNextOpening(now)}`;
+    for (let ev of relevant) {
+      const start = ev.startDate.toJSDate();
+      const end = ev.endDate.toJSDate();
 
-        if (isOpen) {
-          if (isOccupied && currentEvent) {
-            lightClass = "red";
-            statusText = "OCCUPIED";
-            statusColor = "#ff4444";
-            const endStr = currentEvent.endDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'});
-            infoText = `Available at ${endStr}`;
-          } else {
-            lightClass = "green";
-            statusText = "FREE";
-            statusColor = "#22ff44";
+      if (start <= now && end >= now) {
+        isOccupied = true;
+        currentEvent = ev;
+        break;
+      }
 
-            if (useFullHours) {
-              // Indoor: always show "Free until..."
-              const nextStr = nextEventToday 
-                ? nextEventToday.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'})
-                : "close";
-              infoText = `Free until ${nextStr}`;
-            } else {
-              // Outdoor: only show time if there's another event TODAY
-              if (nextEventToday) {
-                const nextStr = nextEventToday.startDate.toJSDate().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Chicago'});
-                infoText = `Free until ${nextStr}`;
-              } else {
-                infoText = "FREE";
-              }
-            }
-          }
-        }
-
-        const tile = document.createElement("div");
-        tile.className = "tile";
-        tile.innerHTML = `
-          <div class="location">${loc}</div>
-          <div class="center">
-            <div class="light ${lightClass}"></div>
-            <div class="status" style="color:${statusColor}">${statusText}</div>
-          </div>
-          <div class="info">${infoText}</div>
-        `;
-        container.appendChild(tile);
-      });
+      // Only consider the next event if it is still TODAY
+      if (!nextEventToday && start > now && isSameDay(start, now)) {
+        nextEventToday = ev;
+        // keep looking in case there is an earlier one, but since we sorted we can break
+        break;
+      }
     }
+
+    let lightClass = "gray", statusText = "CLOSED", statusColor = "#aaa", infoText = `Opens ${getNextOpening(now)}`;
+
+    if (isOpen) {
+      if (isOccupied && currentEvent) {
+        lightClass = "red";
+        statusText = "OCCUPIED";
+        statusColor = "#ff4444";
+        const endStr = currentEvent.endDate.toJSDate().toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          timeZone: 'America/Chicago'
+        });
+        infoText = `Available at ${endStr}`;
+      } else {
+        lightClass = "green";
+        statusText = "FREE";
+        statusColor = "#22ff44";
+
+        if (useFullHours) {
+          // Indoor: "Free until X" only if there is another event today, otherwise "Free until close"
+          if (nextEventToday) {
+            const nextStr = nextEventToday.startDate.toJSDate().toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              timeZone: 'America/Chicago'
+            });
+            infoText = `Free until ${nextStr}`;
+          } else {
+            infoText = "Free until close";
+          }
+        } else {
+          // Outdoor: only show a time if there is another event today
+          if (nextEventToday) {
+            const nextStr = nextEventToday.startDate.toJSDate().toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              timeZone: 'America/Chicago'
+            });
+            infoText = `Free until ${nextStr}`;
+          } else {
+            infoText = "FREE";
+          }
+        }
+      }
+    }
+
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.innerHTML = `
+      <div class="location">${loc}</div>
+      <div class="center">
+        <div class="light ${lightClass}"></div>
+        <div class="status" style="color:${statusColor}">${statusText}</div>
+      </div>
+      <div class="info">${infoText}</div>
+    `;
+    container.appendChild(tile);
+  });
+}
 
     setInterval(loadDashboard, 120000);
     window.onload = loadDashboard;
