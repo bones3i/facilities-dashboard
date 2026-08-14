@@ -136,7 +136,7 @@
     const OUTDOOR_ICS = "https://outlook.office365.com/owa/calendar/133079e774204692bf5b74d2c08d47e9@mbu.edu/291fbbd9fb5d4065a741ac7741db578211444399539403514223/calendar.ics";
 
     const indoorLocations = ["Main Gym", "FCG", "Weight Room"];
-    const outdoorLocations = ["ACAD Field", "Quad", "Division"];
+    const outdoorLocations = ["Practice Field", "Quad", "Division"];
 
     function getLocationText(event) {
       if (!event) return "";
@@ -158,7 +158,7 @@
 
       if (text.includes(target)) return true;
 
-      if (target === "acad field" && (text.includes("acad") || text.includes("field"))) return true;
+      if (target === "practice field" && (text.includes("practice") || text.includes("field"))) return true;
       if (target === "quad" && text.includes("quad")) return true;
       if (target === "division" && text.includes("division")) return true;
 
