@@ -132,8 +132,8 @@
   <script>
     const PROXY_URL = "https://mbu-ics-proxy.robert-fuller-b71.workers.dev";
 
-    const INDOOR_ICS = "https://outlook.office365.com/owa/calendar/133079e774204692bf5b74d2c08d47e9@mbu.edu/81d9a031f189458baa3903bc8243323014179488756612242008/calendar.ics";
-    const OUTDOOR_ICS = "https://outlook.office365.com/owa/calendar/133079e774204692bf5b74d2c08d47e9@mbu.edu/291fbbd9fb5d4065a741ac7741db578211444399539403514223/calendar.ics";
+    //const INDOOR_ICS = "https://outlook.office365.com/owa/calendar/133079e774204692bf5b74d2c08d47e9@mbu.edu/81d9a031f189458baa3903bc8243323014179488756612242008/calendar.ics";
+    //const OUTDOOR_ICS = "https://outlook.office365.com/owa/calendar/133079e774204692bf5b74d2c08d47e9@mbu.edu/291fbbd9fb5d4065a741ac7741db578211444399539403514223/calendar.ics";
 
     const indoorLocations = ["Main Gym", "FCG", "Weight Room"];
     const outdoorLocations = ["Practice Field", "Quad", "Division"];
@@ -210,21 +210,21 @@
       document.getElementById("hoursModal").style.display = "flex";
     }
 
-    async function fetchICS(originalUrl) {
-      const proxyUrl = `${PROXY_URL}?url=${encodeURIComponent(originalUrl)}`;
-      try {
-        const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const text = await response.text();
-        if (!text || !text.includes("BEGIN:VCALENDAR")) {
-          throw new Error("Invalid ICS data received");
-        }
-        return new ICAL.Component(ICAL.parse(text)).getAllSubcomponents("vevent");
-      } catch (e) {
-        console.error("Proxy fetch failed for", originalUrl, e.message);
-        return [];
-      }
+    async function fetchICS(which) {          // which = "indoor" or "outdoor"
+  const proxyUrl = `${PROXY_URL}?cal=${which}`;
+  try {
+    const response = await fetch(proxyUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    if (!text || !text.includes("BEGIN:VCALENDAR")) {
+      throw new Error("Invalid ICS data received");
     }
+    return new ICAL.Component(ICAL.parse(text)).getAllSubcomponents("vevent");
+  } catch (e) {
+    console.error("Proxy fetch failed for", which, e.message);
+    return [];
+  }
+}
 
     async function loadDashboard() {
       const refreshBtn = document.getElementById("refreshBtn");
@@ -236,9 +236,9 @@
 
       try {
         const [indoorEvents, outdoorEvents] = await Promise.all([
-          fetchICS(INDOOR_ICS),
-          fetchICS(OUTDOOR_ICS)
-        ]);
+  fetchICS("indoor"),
+  fetchICS("outdoor")
+]);
 
         const allEvents = [...indoorEvents, ...outdoorEvents];
 
