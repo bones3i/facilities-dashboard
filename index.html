@@ -199,12 +199,36 @@
     }
 
     function getNextOpening(now = new Date()) {
-      const day = now.getDay();
-      if (day === 3) return "8:30 PM tonight";
-      if (day >= 1 && day <= 5) return "tomorrow at 6:00 AM";
-      if (day === 6) return "tomorrow at 6:00 AM";
-      return "tomorrow at 10:00 AM";
+  const day = now.getDay();          // 0 = Sunday, 3 = Wednesday
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  const currentMinutes = hour * 60 + minute;
+
+  // Wednesday special handling
+  if (day === 3) {
+    const eveningOpen = 20 * 60 + 30;   // 8:30 PM
+    const closeTime  = 21 * 60 + 45;    // 9:45 PM
+
+    if (currentMinutes < eveningOpen) {
+      return "8:30 PM tonight";
     }
+    // Already past the evening window → next open is Thursday 6:00 AM
+    return "tomorrow at 6:00 AM";
+  }
+
+  // Monday–Friday (except Wednesday)
+  if (day >= 1 && day <= 5) {
+    return "tomorrow at 6:00 AM";
+  }
+
+  // Saturday
+  if (day === 6) {
+    return "tomorrow at 6:00 AM";      // Sunday opens at 7:45 PM, but you currently use 6 AM language
+  }
+
+  // Sunday
+  return "tomorrow at 6:00 AM";        // Monday 6:00 AM
+}
 
     function showHours() {
       document.getElementById("hoursModal").style.display = "flex";
