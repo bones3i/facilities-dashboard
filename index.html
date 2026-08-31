@@ -328,7 +328,7 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
 
           const gapMinutes = (nextStart - blockEnd) / (1000 * 60);
 
-          if (gapMinutes <= 20) {
+          if (gapMinutes <= 30) {
             // Treat as continuous – extend the busy block
             blockEnd = nextEnd > blockEnd ? nextEnd : blockEnd;
           } else {
