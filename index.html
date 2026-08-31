@@ -299,27 +299,50 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
     let isOccupied = false;
     let currentEvent = null;
     let nextEventToday = null;
+    let availableAt = null;          // the real time it becomes free (after 20+ min gap)
 
     const relevant = events
       .map(vevent => new ICAL.Event(vevent))
       .filter(ev => locationMatches(getLocationText(ev), loc))
       .sort((a, b) => a.startDate.toJSDate() - b.startDate.toJSDate());
 
-    for (let ev of relevant) {
+    // Find current event + build continuous busy block
+    for (let i = 0; i < relevant.length; i++) {
+      const ev = relevant[i];
       const start = ev.startDate.toJSDate();
       const end = ev.endDate.toJSDate();
 
       if (start <= now && end >= now) {
         isOccupied = true;
         currentEvent = ev;
+
+        // Walk forward to find the end of the continuous block
+        let blockEnd = end;
+        for (let j = i + 1; j < relevant.length; j++) {
+          const next = relevant[j];
+          const nextStart = next.startDate.toJSDate();
+          const nextEnd = next.endDate.toJSDate();
+
+          // Only consider events still today
+          if (!isSameDay(nextStart, now)) break;
+
+          const gapMinutes = (nextStart - blockEnd) / (1000 * 60);
+
+          if (gapMinutes <= 20) {
+            // Treat as continuous – extend the busy block
+            blockEnd = nextEnd > blockEnd ? nextEnd : blockEnd;
+          } else {
+            // Found a real gap > 20 minutes
+            break;
+          }
+        }
+        availableAt = blockEnd;
         break;
       }
 
-      // Only consider the next event if it is still TODAY
+      // Track the next event today (for free status)
       if (!nextEventToday && start > now && isSameDay(start, now)) {
         nextEventToday = ev;
-        // keep looking in case there is an earlier one, but since we sorted we can break
-        break;
       }
     }
 
@@ -330,7 +353,8 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
         lightClass = "red";
         statusText = "OCCUPIED";
         statusColor = "#ff4444";
-        const endStr = currentEvent.endDate.toJSDate().toLocaleTimeString('en-US', {
+
+        const endStr = availableAt.toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
           timeZone: 'America/Chicago'
@@ -342,7 +366,7 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
         statusColor = "#22ff44";
 
         if (useFullHours) {
-          // Indoor: "Free until X" only if there is another event today, otherwise "Free until close"
+          // Indoor
           if (nextEventToday) {
             const nextStr = nextEventToday.startDate.toJSDate().toLocaleTimeString('en-US', {
               hour: 'numeric',
@@ -354,7 +378,7 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
             infoText = "Free until close";
           }
         } else {
-          // Outdoor: only show a time if there is another event today
+          // Outdoor
           if (nextEventToday) {
             const nextStr = nextEventToday.startDate.toJSDate().toLocaleTimeString('en-US', {
               hour: 'numeric',
@@ -368,6 +392,20 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
         }
       }
     }
+
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.innerHTML = `
+      <div class="location">${loc}</div>
+      <div class="center">
+        <div class="light ${lightClass}"></div>
+        <div class="status" style="color:${statusColor}">${statusText}</div>
+      </div>
+      <div class="info">${infoText}</div>
+    `;
+    container.appendChild(tile);
+  });
+}
 
     const tile = document.createElement("div");
     tile.className = "tile";
