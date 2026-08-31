@@ -332,7 +332,7 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
             // Treat as continuous – extend the busy block
             blockEnd = nextEnd > blockEnd ? nextEnd : blockEnd;
           } else {
-            // Found a real gap > 20 minutes
+            // Found a real gap > 30 minutes
             break;
           }
         }
