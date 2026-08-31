@@ -407,20 +407,6 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
   });
 }
 
-    const tile = document.createElement("div");
-    tile.className = "tile";
-    tile.innerHTML = `
-      <div class="location">${loc}</div>
-      <div class="center">
-        <div class="light ${lightClass}"></div>
-        <div class="status" style="color:${statusColor}">${statusText}</div>
-      </div>
-      <div class="info">${infoText}</div>
-    `;
-    container.appendChild(tile);
-  });
-}
-
     setInterval(loadDashboard, 120000);
     window.onload = loadDashboard;
   </script>
