@@ -288,7 +288,6 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
   const container = document.getElementById(containerId);
   container.innerHTML = "";
 
-  // Helper: is the event on the same calendar day as "now"?
   function isSameDay(date1, date2) {
     return date1.getFullYear() === date2.getFullYear() &&
            date1.getMonth() === date2.getMonth() &&
@@ -297,59 +296,69 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
 
   locations.forEach(loc => {
     let isOccupied = false;
-    let currentEvent = null;
     let nextEventToday = null;
-    let availableAt = null;          // the real time it becomes free (after 20+ min gap)
+    let availableAt = null;
 
     const relevant = events
       .map(vevent => new ICAL.Event(vevent))
       .filter(ev => locationMatches(getLocationText(ev), loc))
       .sort((a, b) => a.startDate.toJSDate() - b.startDate.toJSDate());
 
-    // Find current event + build continuous busy block
-    for (let i = 0; i < relevant.length; i++) {
-      const ev = relevant[i];
+    // 1. Find all events that are currently active
+    const activeEvents = relevant.filter(ev => {
       const start = ev.startDate.toJSDate();
       const end = ev.endDate.toJSDate();
+      return start <= now && end >= now;
+    });
 
-      if (start <= now && end >= now) {
-        isOccupied = true;
-        currentEvent = ev;
+    if (activeEvents.length > 0) {
+      isOccupied = true;
 
-        // Walk forward to find the end of the continuous block
-        let blockEnd = end;
-        for (let j = i + 1; j < relevant.length; j++) {
-          const next = relevant[j];
-          const nextStart = next.startDate.toJSDate();
-          const nextEnd = next.endDate.toJSDate();
+      // Start with the latest end time among currently active events
+      let blockEnd = activeEvents.reduce((latest, ev) => {
+        const end = ev.endDate.toJSDate();
+        return end > latest ? end : latest;
+      }, new Date(0));
 
-          // Only consider events still today
-          if (!isSameDay(nextStart, now)) break;
+      // 2. Walk forward through later events and merge if gap ≤ 30 minutes
+      for (let i = 0; i < relevant.length; i++) {
+        const ev = relevant[i];
+        const start = ev.startDate.toJSDate();
+        const end = ev.endDate.toJSDate();
 
-          const gapMinutes = (nextStart - blockEnd) / (1000 * 60);
+        // Only look at events that start after (or at) the current block end
+        if (start < blockEnd) continue;
+        if (!isSameDay(start, now)) break;
 
-          if (gapMinutes <= 30) {
-            // Treat as continuous – extend the busy block
-            blockEnd = nextEnd > blockEnd ? nextEnd : blockEnd;
-          } else {
-            // Found a real gap > 30 minutes
-            break;
-          }
+        const gapMinutes = (start - blockEnd) / (1000 * 60);
+
+        if (gapMinutes <= 30) {
+          // Extend the continuous block
+          if (end > blockEnd) blockEnd = end;
+        } else {
+          // Real gap found
+          break;
         }
-        availableAt = blockEnd;
-        break;
       }
 
-      // Track the next event today (for free status)
-      if (!nextEventToday && start > now && isSameDay(start, now)) {
-        nextEventToday = ev;
+      availableAt = blockEnd;
+    } else {
+      // Not currently occupied – find the next event today
+      for (let ev of relevant) {
+        const start = ev.startDate.toJSDate();
+        if (start > now && isSameDay(start, now)) {
+          nextEventToday = ev;
+          break;
+        }
       }
     }
 
-    let lightClass = "gray", statusText = "CLOSED", statusColor = "#aaa", infoText = `Opens ${getNextOpening(now)}`;
+    // ----- Display logic (unchanged from your last working version) -----
+    let lightClass = "gray", statusText = "CLOSED", statusColor = "#aaa",
+        infoText = `Opens ${getNextOpening(now)}`;
 
     if (isOpen) {
-      if (isOccupied && currentEvent) {
+      if (isOccupied) {
         lightClass = "red";
         statusText = "OCCUPIED";
         statusColor = "#ff4444";
