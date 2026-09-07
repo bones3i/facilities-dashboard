@@ -139,38 +139,68 @@
     const outdoorLocations = ["Practice Field", "Quad", "Division"];
 
     function getLocationText(event) {
-      if (!event) return "";
-      if (typeof event.location === "string") return event.location;
-      if (event.location && typeof event.location === "object") {
-        return event.location.value || event.location.val || "";
-      }
-      if (event.component) {
-        const locProp = event.component.getFirstPropertyValue("location");
-        if (locProp) return locProp;
-      }
-      return "";
+  if (!event) return "";
+
+  let raw = "";
+
+  // Try the normal location property first
+  if (typeof event.location === "string") {
+    raw = event.location;
+  } else if (event.location && typeof event.location === "object") {
+    raw = event.location.value || event.location.val || event.location.toString() || "";
+  }
+
+  // Fallback: pull directly from the iCal component (more reliable with Outlook)
+  if (!raw && event.component) {
+    const locProp = event.component.getFirstProperty("location");
+    if (locProp) {
+      raw = locProp.getFirstValue() || locProp.toString() || "";
     }
+  }
 
-    function locationMatches(eventLocationText, targetLoc) {
-      if (!eventLocationText) return false;
-      const target = targetLoc.toLowerCase().trim();
-      const text = eventLocationText.toLowerCase().trim();
+  // Clean the string aggressively
+  return cleanLocation(raw);
+}
 
-      if (text.includes(target)) return true;
+function cleanLocation(str) {
+  if (!str) return "";
 
-      if (target === "practice field" && (text.includes("practice") || text.includes("field"))) return true;
-      if (target === "quad" && text.includes("quad")) return true;
-      if (target === "division" && text.includes("division")) return true;
+  return str
+    .toString()
+    .replace(/\u00A0/g, " ")          // non-breaking spaces
+    .replace(/[\u200B-\u200D\uFEFF]/g, "") // zero-width characters
+    .replace(/\s+/g, " ")             // collapse multiple spaces
+    .trim();
+}
 
-      const separators = [',', ';', ' and ', ' & ', '+', '/'];
-      for (let sep of separators) {
-        if (text.includes(sep)) {
-          const parts = text.split(sep).map(p => p.trim());
-          if (parts.some(part => part === target || part.includes(target))) return true;
-        }
-      }
-      return false;
+function locationMatches(eventLocationText, targetLoc) {
+  if (!eventLocationText) return false;
+
+  const target = cleanLocation(targetLoc).toLowerCase();
+  const text = cleanLocation(eventLocationText).toLowerCase();
+
+  // Direct match
+  if (text === target || text.includes(target)) return true;
+
+  // Outdoor / special cases
+  if (target === "practice field" && (text.includes("practice") || text.includes("field"))) return true;
+  if (target === "quad" && text.includes("quad")) return true;
+  if (target === "division" && text.includes("division")) return true;
+  if (target === "main gym" && (text.includes("main gym") || text.includes("maingym"))) return true;
+  if (target === "fcg" && (text.includes("fcg") || text.includes("fieldhouse") || text.includes("field house"))) return true;
+  if (target === "weight room" && (text.includes("weight") || text.includes("wr"))) return true;
+
+  // Handle comma / "and" / "&" separated lists
+  const separators = [",", ";", " and ", " & ", "+", "/"];
+  for (let sep of separators) {
+    if (text.includes(sep)) {
+      const parts = text.split(sep).map(p => cleanLocation(p).toLowerCase());
+      if (parts.some(part => part === target || part.includes(target))) return true;
     }
+  }
+
+  return false;
+}
 
     function isFacilityOpen(now = new Date()) {
       const day = now.getDay();
