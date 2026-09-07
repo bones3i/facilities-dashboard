@@ -178,24 +178,28 @@ function getLocationText(event) {
 
   let raw = "";
 
-  // Normal string location
+  // 1. Normal string
   if (typeof event.location === "string") {
     raw = event.location;
   }
-  // Outlook sometimes stores it as an object
+  // 2. Object-style location (common with Outlook)
   else if (event.location && typeof event.location === "object") {
     raw = event.location.value || event.location.val || "";
   }
 
-  // Most reliable way to get the real value from Outlook entities
+  // 3. Most reliable method for Outlook location entities
   if (!raw && event.component) {
-    const locProp = event.component.getFirstProperty("location");
-    if (locProp) {
-      raw = locProp.getFirstValue() || "";
+    try {
+      const locProp = event.component.getFirstProperty("location");
+      if (locProp) {
+        raw = locProp.getFirstValue() || "";
+      }
+    } catch (e) {
+      // ignore
     }
   }
 
-  // Clean spaces only
+  // Final cleanup: spaces only + force string
   return (raw || "").toString().replace(/\s+/g, " ").trim();
 }
 
@@ -208,12 +212,14 @@ function locationMatches(eventLocationText, targetLoc) {
   // Direct match (case-insensitive, space-normalized)
   if (text === target || text.includes(target)) return true;
 
-  // Handle multiple locations in one field ("Main Gym, Weight Room")
+  // Multiple locations in one field ("Main Gym, Weight Room")
   const separators = [",", ";", " and ", " & ", "+", "/"];
   for (let sep of separators) {
     if (text.includes(sep)) {
-      const parts = text.split(sep).map(p => p.replace(/\s+/g, " ").trim());
-      if (parts.some(part => part === target || part.includes(target))) return true;
+      const parts = text.split(sep).map(p => p.replace(/\s+/g, " ").trim().toLowerCase());
+      if (parts.some(part => part === target || part.includes(target))) {
+        return true;
+      }
     }
   }
 
