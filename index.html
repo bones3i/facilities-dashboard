@@ -173,28 +173,46 @@ function cleanLocation(str) {
     .trim();
 }
 
+function getLocationText(event) {
+  if (!event) return "";
+
+  let raw = "";
+
+  // Normal string location
+  if (typeof event.location === "string") {
+    raw = event.location;
+  }
+  // Outlook sometimes stores it as an object
+  else if (event.location && typeof event.location === "object") {
+    raw = event.location.value || event.location.val || "";
+  }
+
+  // Most reliable way to get the real value from Outlook entities
+  if (!raw && event.component) {
+    const locProp = event.component.getFirstProperty("location");
+    if (locProp) {
+      raw = locProp.getFirstValue() || "";
+    }
+  }
+
+  // Clean spaces only
+  return (raw || "").toString().replace(/\s+/g, " ").trim();
+}
+
 function locationMatches(eventLocationText, targetLoc) {
   if (!eventLocationText) return false;
 
-  const target = cleanLocation(targetLoc).toLowerCase();
-  const text = cleanLocation(eventLocationText).toLowerCase();
+  const text = eventLocationText.toString().replace(/\s+/g, " ").trim().toLowerCase();
+  const target = targetLoc.toString().replace(/\s+/g, " ").trim().toLowerCase();
 
-  // Direct match
+  // Direct match (case-insensitive, space-normalized)
   if (text === target || text.includes(target)) return true;
 
-  // Outdoor / special cases
-  if (target === "practice field" && (text.includes("practice") || text.includes("field"))) return true;
-  if (target === "quad" && text.includes("quad")) return true;
-  if (target === "division" && text.includes("division")) return true;
-  if (target === "main gym" && (text.includes("main gym") || text.includes("maingym"))) return true;
-  if (target === "fcg" && (text.includes("fcg") || text.includes("fieldhouse") || text.includes("field house"))) return true;
-  if (target === "weight room" && (text.includes("weight") || text.includes("wr"))) return true;
-
-  // Handle comma / "and" / "&" separated lists
+  // Handle multiple locations in one field ("Main Gym, Weight Room")
   const separators = [",", ";", " and ", " & ", "+", "/"];
   for (let sep of separators) {
     if (text.includes(sep)) {
-      const parts = text.split(sep).map(p => cleanLocation(p).toLowerCase());
+      const parts = text.split(sep).map(p => p.replace(/\s+/g, " ").trim());
       if (parts.some(part => part === target || part.includes(target))) return true;
     }
   }
@@ -334,10 +352,6 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
       .filter(ev => locationMatches(getLocationText(ev), loc))
       .sort((a, b) => a.startDate.toJSDate() - b.startDate.toJSDate());
 
-    // Temporary debug – remove later
-relevant.forEach(ev => {
-  console.log(`[${loc}] Raw location:`, getLocationText(ev), "| Summary:", ev.summary);
-});
     
     // 1. Find all events that are currently active
     const activeEvents = relevant.filter(ev => {
