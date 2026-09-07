@@ -334,6 +334,11 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
       .filter(ev => locationMatches(getLocationText(ev), loc))
       .sort((a, b) => a.startDate.toJSDate() - b.startDate.toJSDate());
 
+    // Temporary debug – remove later
+relevant.forEach(ev => {
+  console.log(`[${loc}] Raw location:`, getLocationText(ev), "| Summary:", ev.summary);
+});
+    
     // 1. Find all events that are currently active
     const activeEvents = relevant.filter(ev => {
       const start = ev.startDate.toJSDate();
