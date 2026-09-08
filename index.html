@@ -138,45 +138,10 @@
     const indoorLocations = ["Main Gym", "FCG", "Weight Room"];
     const outdoorLocations = ["Practice Field", "Quad", "Division"];
 
-    function getLocationText(event) {
-  if (!event) return "";
-
-  let raw = "";
-
-  // Try the normal location property first
-  if (typeof event.location === "string") {
-    raw = event.location;
-  } else if (event.location && typeof event.location === "object") {
-    raw = event.location.value || event.location.val || event.location.toString() || "";
-  }
-
-  // Fallback: pull directly from the iCal component (more reliable with Outlook)
-  if (!raw && event.component) {
-    const locProp = event.component.getFirstProperty("location");
-    if (locProp) {
-      raw = locProp.getFirstValue() || locProp.toString() || "";
-    }
-  }
-
-  // Clean the string aggressively
-  return cleanLocation(raw);
-}
-
-function cleanLocation(str) {
-  if (!str) return "";
-
-  return str
-    .toString()
-    .replace(/\u00A0/g, " ")          // non-breaking spaces
-    .replace(/[\u200B-\u200D\uFEFF]/g, "") // zero-width characters
-    .replace(/\s+/g, " ")             // collapse multiple spaces
-    .trim();
-}
-
 function getLocationText(event) {
   if (!event) return "";
 
-  // Prefer the original ICAL.Event if we created a wrapper
+  // Support the recurring-event wrapper if you added it
   const src = event._original || event;
 
   let raw = "";
@@ -187,20 +152,21 @@ function getLocationText(event) {
     raw = src.location.value || src.location.val || "";
   }
 
+  // Reliable fallback for Outlook location entities
   if (!raw && src.component) {
     try {
       const locProp = src.component.getFirstProperty("location");
-      if (locProp) raw = locProp.getFirstValue() || "";
-    } catch (e) {}
+      if (locProp) {
+        raw = locProp.getFirstValue() || "";
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
+  // Case is handled in locationMatches; here we only clean spaces
   return (raw || "").toString().replace(/\s+/g, " ").trim();
 }
-
-  // Final cleanup: spaces only + force string
-  return (raw || "").toString().replace(/\s+/g, " ").trim();
-}
-
 function locationMatches(eventLocationText, targetLoc) {
   if (!eventLocationText) return false;
 
