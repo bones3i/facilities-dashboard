@@ -363,10 +363,21 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
     let availableAt = null;
 
     const relevant = events
-      .map(vevent => new ICAL.Event(vevent))
-      .filter(ev => locationMatches(getLocationText(ev), loc))
-      .sort((a, b) => a.startDate.toJSDate() - b.startDate.toJSDate());
-
+  .map(ev => {
+    // Already a usable event object (normal or expanded recurring)
+    if (ev && ev.startDate && typeof ev.startDate.toJSDate === "function") {
+      return ev;
+    }
+    // Raw vevent component – convert once
+    try {
+      return new ICAL.Event(ev);
+    } catch (e) {
+      console.warn("Skipped bad event", e);
+      return null;
+    }
+  })
+  .filter(ev => ev && locationMatches(getLocationText(ev), loc))
+  .sort((a, b) => a.startDate.toJSDate() - b.startDate.toJSDate());
     
     // 1. Find all events that are currently active
     const activeEvents = relevant.filter(ev => {
