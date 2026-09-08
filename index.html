@@ -176,28 +176,26 @@ function cleanLocation(str) {
 function getLocationText(event) {
   if (!event) return "";
 
+  // Prefer the original ICAL.Event if we created a wrapper
+  const src = event._original || event;
+
   let raw = "";
 
-  // 1. Normal string
-  if (typeof event.location === "string") {
-    raw = event.location;
-  }
-  // 2. Object-style location (common with Outlook)
-  else if (event.location && typeof event.location === "object") {
-    raw = event.location.value || event.location.val || "";
+  if (typeof src.location === "string") {
+    raw = src.location;
+  } else if (src.location && typeof src.location === "object") {
+    raw = src.location.value || src.location.val || "";
   }
 
-  // 3. Most reliable method for Outlook location entities
-  if (!raw && event.component) {
+  if (!raw && src.component) {
     try {
-      const locProp = event.component.getFirstProperty("location");
-      if (locProp) {
-        raw = locProp.getFirstValue() || "";
-      }
-    } catch (e) {
-      // ignore
-    }
+      const locProp = src.component.getFirstProperty("location");
+      if (locProp) raw = locProp.getFirstValue() || "";
+    } catch (e) {}
   }
+
+  return (raw || "").toString().replace(/\s+/g, " ").trim();
+}
 
   // Final cleanup: spaces only + force string
   return (raw || "").toString().replace(/\s+/g, " ").trim();
@@ -288,7 +286,7 @@ function locationMatches(eventLocationText, targetLoc) {
       document.getElementById("hoursModal").style.display = "flex";
     }
 
-    async function fetchICS(which) {          // which = "indoor" or "outdoor"
+    async function fetchICS(which) {
   const proxyUrl = `${PROXY_URL}?cal=${which}`;
   try {
     const response = await fetch(proxyUrl);
@@ -297,7 +295,52 @@ function locationMatches(eventLocationText, targetLoc) {
     if (!text || !text.includes("BEGIN:VCALENDAR")) {
       throw new Error("Invalid ICS data received");
     }
-    return new ICAL.Component(ICAL.parse(text)).getAllSubcomponents("vevent");
+
+    const jcal = ICAL.parse(text);
+    const comp = new ICAL.Component(jcal);
+    const vevents = comp.getAllSubcomponents("vevent");
+
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const endOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    const expanded = [];
+
+    vevents.forEach(vevent => {
+      const event = new ICAL.Event(vevent);
+
+      if (event.isRecurring()) {
+        // Expand recurring series for today only
+        const iterator = event.iterator();
+        let next;
+        while ((next = iterator.next())) {
+          const occStart = next.toJSDate();
+          if (occStart > endOfDay) break;          // past today
+          if (occStart < startOfDay) continue;     // before today
+
+          const duration = event.duration;
+          const occEnd = duration
+            ? new Date(occStart.getTime() + duration.toSeconds() * 1000)
+            : new Date(occStart.getTime() + 60 * 60 * 1000); // fallback 1 hour
+
+          // Create a simple object that looks enough like ICAL.Event for the rest of the code
+          expanded.push({
+            startDate: { toJSDate: () => occStart },
+            endDate:   { toJSDate: () => occEnd },
+            summary: event.summary,
+            location: event.location,
+            component: event.component,
+            // keep original for getLocationText
+            _original: event
+          });
+        }
+      } else {
+        // Non-recurring – keep as normal ICAL.Event
+        expanded.push(event);
+      }
+    });
+
+    return expanded;
   } catch (e) {
     console.error("Proxy fetch failed for", which, e.message);
     return [];
