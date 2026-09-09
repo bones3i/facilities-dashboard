@@ -216,6 +216,25 @@ function locationMatches(eventLocationText, targetLoc) {
       return currentMinutes >= openTime && currentMinutes <= closeTime;
     }
 
+function adjustWednesdayAvailability(availableAt, now) {
+  if (!availableAt || now.getDay() !== 3) return availableAt; // only Wednesday
+
+  const d = new Date(availableAt);
+  const mins = d.getHours() * 60 + d.getMinutes();
+
+  const morningClose = 17 * 60;      // 5:00 PM
+  const eveningOpen  = 20 * 60 + 30;  // 8:30 PM
+
+  // If "available" falls in the closed window (5:00 PM up to but not including 8:30 PM)
+  if (mins >= morningClose && mins < eveningOpen) {
+    const adjusted = new Date(d);
+    adjusted.setHours(20, 30, 0, 0); // 8:30 PM that day
+    return adjusted;
+  }
+
+  return availableAt;
+}
+    
     function getNextOpening(now = new Date()) {
   const day = now.getDay();          // 0 = Sunday, 3 = Wednesday
   const hour = now.getHours();
@@ -416,7 +435,7 @@ function renderSection(containerId, locations, events, isOpen, now, useFullHours
         }
       }
 
-      availableAt = blockEnd;
+availableAt = adjustWednesdayAvailability(blockEnd, now);
     } else {
       // Not currently occupied – find the next event today
       for (let ev of relevant) {
